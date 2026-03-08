@@ -24,6 +24,28 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Offline Real Data Mode (No API)
+
+This project now supports a practical offline mode using local class data:
+
+- Real student list is loaded from `lib/data/csm-students.ts`.
+- Timetable data is defined in `lib/store.ts` (based on your class timetable).
+- App state is persisted in browser storage via Zustand `persist` middleware.
+
+### Refresh students from Excel
+
+If your student list changes, update the Excel file at:
+
+`C:\Users\netha\Documents\CSM\CSM Students List.xlsx`
+
+Then run:
+
+```bash
+npm run import:students
+```
+
+This regenerates `lib/data/csm-students.ts` from the Excel sheet.
+
 ## Learn More
 
 To learn more, take a look at the following resources:

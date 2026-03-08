@@ -28,7 +28,7 @@ export function AttendanceBar() {
         <div className="flex h-full transition-all duration-300">
           <div
             className={cn(
-              "h-full bg-primary transition-all duration-300",
+              "h-full bg-green-600 transition-all duration-300",
               presentPercent > 0 && "rounded-l-full"
             )}
             style={{ width: `${presentPercent}%` }}
@@ -49,7 +49,7 @@ export function AttendanceBar() {
 
       <div className="flex flex-wrap gap-4 text-xs">
         <div className="flex items-center gap-2">
-          <div className="h-2.5 w-2.5 rounded-full bg-primary" />
+          <div className="h-2.5 w-2.5 rounded-full bg-green-600" />
           <span className="text-muted-foreground">
             Present: {present} ({Math.round(presentPercent)}%)
           </span>

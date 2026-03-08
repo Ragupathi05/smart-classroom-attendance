@@ -19,9 +19,14 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const { user, logout, setCurrentPage } = useAppStore()
+  const { user, logout, setCurrentPage, notifications, markNotificationsRead } = useAppStore()
   const [time, setTime] = useState<Date | null>(null)
   const [mounted, setMounted] = useState(false)
+
+  const visibleNotifications = notifications
+    .filter((notification) => notification.targetRole === "all" || notification.targetRole === user?.role)
+    .slice(0, 5)
+  const unreadCount = visibleNotifications.filter((notification) => !notification.read).length
 
   useEffect(() => {
     setMounted(true)
@@ -85,29 +90,36 @@ export function Header({ onMenuClick }: HeaderProps) {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative h-9 w-9 hover:bg-secondary">
               <Bell className="h-5 w-5" />
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-chart-5 text-[10px] font-bold text-white">
-                3
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-chart-5 text-[10px] font-bold text-white">
+                  {unreadCount}
+                </span>
+              )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72">
+          <DropdownMenuContent align="end" className="w-72" onCloseAutoFocus={markNotificationsRead}>
             <DropdownMenuLabel className="flex items-center justify-between">
               <span>Notifications</span>
-              <span className="text-xs font-normal text-muted-foreground">3 new</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                {unreadCount > 0 ? `${unreadCount} new` : "No new"}
+              </span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <span className="text-sm font-medium">Correction Request</span>
-              <span className="text-xs text-muted-foreground">Student requested attendance correction for CS101</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <span className="text-sm font-medium">Attendance Submitted</span>
-              <span className="text-xs text-muted-foreground">Data Structures class attendance marked successfully</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <span className="text-sm font-medium">Low Attendance Alert</span>
-              <span className="text-xs text-muted-foreground">3 students below 75% attendance threshold</span>
-            </DropdownMenuItem>
+            {visibleNotifications.length === 0 ? (
+              <DropdownMenuItem className="py-3 text-xs text-muted-foreground" disabled>
+                No notifications available
+              </DropdownMenuItem>
+            ) : (
+              visibleNotifications.map((notification) => (
+                <DropdownMenuItem key={notification.id} className="flex flex-col items-start gap-1 py-3">
+                  <span className="text-sm font-medium">{notification.title}</span>
+                  <span className="text-xs text-muted-foreground">{notification.message}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {new Date(notification.createdAt).toLocaleString()}
+                  </span>
+                </DropdownMenuItem>
+              ))
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 

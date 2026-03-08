@@ -1,6 +1,6 @@
 "use client"
 
-import { Users, UserCheck, Clock, AlertCircle, TrendingUp } from "lucide-react"
+import { Users, UserCheck, Clock, AlertCircle } from "lucide-react"
 import { useAppStore } from "@/lib/store"
 import { TimetableGrid } from "./timetable-grid"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,7 +9,7 @@ const stats = [
   {
     title: "Total Students",
     icon: Users,
-    getValue: () => 62,
+    getValue: (_timetable: any[], students: any[]) => students.length,
     color: "text-primary",
     bgColor: "bg-primary/10",
     trend: null,
@@ -17,7 +17,11 @@ const stats = [
   {
     title: "Classes Today",
     icon: Clock,
-    getValue: () => 6,
+    getValue: (timetable: any[]) => {
+      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+      const today = dayNames[new Date().getDay()]
+      return timetable.filter((cell) => cell.day === today).length
+    },
     color: "text-chart-2",
     bgColor: "bg-chart-2/10",
     trend: null,
@@ -28,12 +32,13 @@ const stats = [
     getValue: (timetable: any[]) => timetable.filter((t) => t.status === "submitted").length,
     color: "text-chart-2",
     bgColor: "bg-chart-2/10",
-    trend: "+2 today",
+    trend: null,
   },
   {
     title: "Pending Corrections",
     icon: AlertCircle,
-    getValue: () => 3,
+    getValue: (_timetable: any[], _students: any[], correctionRequests: any[]) =>
+      correctionRequests.filter((req) => req.status === "pending").length,
     color: "text-chart-3",
     bgColor: "bg-chart-3/10",
     trend: null,
@@ -41,7 +46,7 @@ const stats = [
 ]
 
 export function Dashboard() {
-  const { timetable, attendanceRecords, user } = useAppStore()
+  const { timetable, attendanceRecords, user, students, correctionRequests } = useAppStore()
 
   const todayRecords = attendanceRecords.filter(
     (r) => r.date === new Date().toISOString().split("T")[0]
@@ -65,7 +70,7 @@ export function Dashboard() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, index) => {
           const Icon = stat.icon
-          const value = stat.getValue(timetable)
+          const value = stat.getValue(timetable, students, correctionRequests)
           return (
             <Card 
               key={stat.title} 
@@ -79,12 +84,7 @@ export function Dashboard() {
                 <div className="flex-1">
                   <p className="text-2xl font-bold tabular-nums text-foreground">{value}</p>
                   <p className="text-xs text-muted-foreground">{stat.title}</p>
-                  {stat.trend && (
-                    <p className="mt-0.5 flex items-center gap-1 text-[10px] text-chart-2">
-                      <TrendingUp className="h-3 w-3" />
-                      {stat.trend}
-                    </p>
-                  )}
+                  {stat.trend && <p className="mt-0.5 text-[10px] text-chart-2">{stat.trend}</p>}
                 </div>
               </CardContent>
             </Card>

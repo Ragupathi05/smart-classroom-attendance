@@ -17,15 +17,16 @@ import { Spinner } from "@/components/ui/spinner"
 export function AttendanceApp() {
   const [mounted, setMounted] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { isAuthenticated, currentPage } = useAppStore()
+  const { isAuthenticated, currentPage, ensureWeeklyTimetableReset } = useAppStore()
 
   useEffect(() => {
+    ensureWeeklyTimetableReset()
     setMounted(true)
-  }, [])
+  }, [ensureWeeklyTimetableReset])
 
   if (!mounted) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-background" suppressHydrationWarning>
         <Spinner className="h-8 w-8 text-primary" />
       </div>
     )
@@ -60,7 +61,7 @@ export function AttendanceApp() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" suppressHydrationWarning>
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <Header onMenuClick={() => setSidebarOpen(true)} />
       <main className="pt-16 lg:ml-64">

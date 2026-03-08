@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import {
   Line,
   LineChart,
@@ -28,44 +29,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-// Weekly attendance trend data
-const weeklyTrendData = [
-  { day: "Mon", attendance: 92 },
-  { day: "Tue", attendance: 88 },
-  { day: "Wed", attendance: 95 },
-  { day: "Thu", attendance: 85 },
-  { day: "Fri", attendance: 90 },
-  { day: "Sat", attendance: 78 },
-]
-
-// Subject-wise attendance data
-const subjectData = [
-  { subject: "DL", fullName: "Deep Learning", attendance: 92 },
-  { subject: "SS", fullName: "System Software", attendance: 88 },
-  { subject: "EB", fullName: "E-Business", attendance: 95 },
-  { subject: "CCAI", fullName: "Cloud Computing & AI", attendance: 82 },
-  { subject: "RL", fullName: "Reinforcement Learning", attendance: 90 },
-  { subject: "BDA", fullName: "Big Data Analytics", attendance: 85 },
-  { subject: "ATCD", fullName: "Automata Theory", attendance: 78 },
-  { subject: "RM", fullName: "Research Methodology", attendance: 91 },
-]
-
-// Students below 75% attendance
-const lowAttendanceStudents = [
-  { rollNumber: "21CS006", name: "Farhan Ali", attendance: 68, classes: 42, attended: 28 },
-  { rollNumber: "21CS012", name: "Lakshmi Iyer", attendance: 72, classes: 42, attended: 30 },
-  { rollNumber: "21CS015", name: "Omkar Deshmukh", attendance: 65, classes: 42, attended: 27 },
-  { rollNumber: "21CS019", name: "Sneha Kulkarni", attendance: 70, classes: 42, attended: 29 },
-]
-
-// Overall stats
-const overallStats = {
-  averageAttendance: 87,
-  totalClasses: 42,
-  highestAttendance: { subject: "E-Business", value: 95 },
-  lowestAttendance: { subject: "Automata Theory", value: 78 },
-}
-
 // Colors for charts - computed values, not CSS variables
 const COLORS = {
   primary: "#818cf8", // Indigo (primary)
@@ -76,8 +39,157 @@ const COLORS = {
   grid: "#374151",
 }
 
+const ATTENDED_STATUSES = new Set(["present", "permission"])
+const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const
+
+const getShortWeekday = (dateStr: string) => {
+  const date = new Date(`${dateStr}T00:00:00`)
+  return date.toLocaleDateString("en-US", { weekday: "short" })
+}
+
+const toPercent = (attended: number, total: number) =>
+  total > 0 ? Math.round((attended / total) * 100) : 0
+
 export function Analytics() {
-  const { user } = useAppStore()
+  const { attendanceRecords, students } = useAppStore()
+
+  const {
+    overallStats,
+    weeklyTrendData,
+    subjectData,
+    lowAttendanceStudents,
+  } = useMemo(() => {
+    const weeklyBuckets = WEEK_DAYS.reduce<Record<string, { attended: number; total: number; classes: number }>>(
+      (acc, day) => {
+        acc[day] = { attended: 0, total: 0, classes: 0 }
+        return acc
+      },
+      {}
+    )
+
+    const subjectBuckets = new Map<
+      string,
+      { subject: string; fullName: string; attended: number; total: number; classes: number }
+    >()
+
+    let overallAttended = 0
+    let overallTotal = 0
+
+    attendanceRecords.forEach((record) => {
+      const total = record.students.length
+      const attended = record.students.filter((student) => ATTENDED_STATUSES.has(student.status)).length
+
+      overallAttended += attended
+      overallTotal += total
+
+      const weekday = getShortWeekday(record.date)
+      if (weeklyBuckets[weekday]) {
+        weeklyBuckets[weekday].attended += attended
+        weeklyBuckets[weekday].total += total
+        weeklyBuckets[weekday].classes += 1
+      }
+
+      const existing = subjectBuckets.get(record.subjectCode)
+      if (existing) {
+        existing.attended += attended
+        existing.total += total
+        existing.classes += 1
+      } else {
+        subjectBuckets.set(record.subjectCode, {
+          subject: record.subjectCode,
+          fullName: record.subject,
+          attended,
+          total,
+          classes: 1,
+        })
+      }
+    })
+
+    const computedWeeklyTrendData = WEEK_DAYS.map((day) => {
+      const bucket = weeklyBuckets[day]
+      return {
+        day,
+        attendance: toPercent(bucket.attended, bucket.total),
+      }
+    })
+
+    const computedSubjectData = Array.from(subjectBuckets.values())
+      .map((subject) => ({
+        subject: subject.subject,
+        fullName: subject.fullName,
+        attendance: toPercent(subject.attended, subject.total),
+        classes: subject.classes,
+      }))
+      .sort((a, b) => a.subject.localeCompare(b.subject))
+
+    const perStudent = new Map<string, { name: string; rollNumber: string; attended: number; classes: number }>()
+    students.forEach((student) => {
+      perStudent.set(student.rollNumber, {
+        name: student.name,
+        rollNumber: student.rollNumber,
+        attended: 0,
+        classes: 0,
+      })
+    })
+
+    attendanceRecords.forEach((record) => {
+      record.students.forEach((student) => {
+        const existing = perStudent.get(student.rollNumber)
+        if (!existing) return
+
+        existing.classes += 1
+        if (ATTENDED_STATUSES.has(student.status)) {
+          existing.attended += 1
+        }
+      })
+    })
+
+    const computedLowAttendanceStudents = Array.from(perStudent.values())
+      .filter((student) => student.classes > 0)
+      .map((student) => {
+        const attendance = toPercent(student.attended, student.classes)
+        return {
+          ...student,
+          attendance,
+        }
+      })
+      .filter((student) => student.attendance < 75)
+      .sort((a, b) => a.attendance - b.attendance)
+
+    const highestSubject = computedSubjectData.reduce<{ subject: string; value: number } | null>(
+      (best, subject) => {
+        if (!best || subject.attendance > best.value) {
+          return { subject: subject.fullName, value: subject.attendance }
+        }
+        return best
+      },
+      null
+    )
+
+    const lowestSubject = computedSubjectData.reduce<{ subject: string; value: number } | null>(
+      (worst, subject) => {
+        if (!worst || subject.attendance < worst.value) {
+          return { subject: subject.fullName, value: subject.attendance }
+        }
+        return worst
+      },
+      null
+    )
+
+    const computedOverallStats = {
+      averageAttendance: toPercent(overallAttended, overallTotal),
+      totalClasses: attendanceRecords.length,
+      highestAttendance: highestSubject ?? { subject: "N/A", value: 0 },
+      lowestAttendance: lowestSubject ?? { subject: "N/A", value: 0 },
+    }
+
+    return {
+      overallStats: computedOverallStats,
+      weeklyTrendData: computedWeeklyTrendData,
+      subjectData: computedSubjectData,
+      lowAttendanceStudents: computedLowAttendanceStudents,
+    }
+  }, [attendanceRecords, students])
 
   return (
     <div className="space-y-6">
@@ -221,6 +333,11 @@ export function Analytics() {
                 </Bar>
               </BarChart>
             </ChartContainer>
+            {subjectData.length === 0 && (
+              <div className="mt-4 text-center text-sm text-muted-foreground">
+                No attendance records available yet.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

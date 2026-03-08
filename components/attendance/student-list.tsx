@@ -6,11 +6,15 @@ import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 
-export function StudentList() {
+interface StudentListProps {
+  readOnly?: boolean
+}
+
+export function StudentList({ readOnly = false }: StudentListProps) {
   const { students, updateStudentStatus } = useAppStore()
 
   const statusOptions: { value: AttendanceStatus; label: string; color: string }[] = [
-    { value: "present", label: "Present", color: "text-primary" },
+    { value: "present", label: "Present", color: "text-green-600" },
     { value: "permission", label: "Permission", color: "text-warning" },
     { value: "absent", label: "Absent", color: "text-destructive" },
   ]
@@ -45,6 +49,7 @@ export function StudentList() {
                 value={student.status}
                 onValueChange={(value) => updateStudentStatus(student.id, value as AttendanceStatus)}
                 className="flex gap-6"
+                disabled={readOnly}
               >
                 {statusOptions.map((option) => (
                   <div key={option.value} className="flex items-center gap-2">
@@ -53,7 +58,7 @@ export function StudentList() {
                       id={`${student.id}-${option.value}`}
                       className={cn(
                         "border-muted-foreground",
-                        student.status === option.value && option.value === "present" && "border-primary text-primary",
+                        student.status === option.value && option.value === "present" && "border-green-600 text-green-600",
                         student.status === option.value && option.value === "permission" && "border-warning text-warning",
                         student.status === option.value && option.value === "absent" && "border-destructive text-destructive"
                       )}
@@ -62,6 +67,7 @@ export function StudentList() {
                       htmlFor={`${student.id}-${option.value}`}
                       className={cn(
                         "cursor-pointer text-sm",
+                        readOnly && "cursor-not-allowed opacity-80",
                         student.status === option.value ? option.color : "text-muted-foreground"
                       )}
                     >

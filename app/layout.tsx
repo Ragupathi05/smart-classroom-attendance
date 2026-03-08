@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
+import Script from 'next/script'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
@@ -37,8 +38,34 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased" suppressHydrationWarning>
+        <Script id="strip-bis-attr" strategy="beforeInteractive">
+          {`(() => {
+  const stripBisAttr = () => {
+    document.querySelectorAll('[bis_skin_checked]').forEach((element) => {
+      element.removeAttribute('bis_skin_checked');
+    });
+  };
+
+  stripBisAttr();
+
+  const observer = new MutationObserver(() => {
+    stripBisAttr();
+  });
+
+  observer.observe(document.documentElement, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['bis_skin_checked'],
+  });
+
+  window.addEventListener('load', () => {
+    stripBisAttr();
+    observer.disconnect();
+  }, { once: true });
+})();`}
+        </Script>
         {children}
         <Analytics />
       </body>

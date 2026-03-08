@@ -14,7 +14,7 @@ export function AttendanceSummary() {
 
   const stats = [
     { label: "Total Students", value: total, icon: Users, color: "text-foreground", bgColor: "bg-muted" },
-    { label: "Present", value: present, icon: UserCheck, color: "text-primary", bgColor: "bg-primary/10" },
+    { label: "Present", value: present, icon: UserCheck, color: "text-green-600", bgColor: "bg-green-100" },
     { label: "Permission", value: permission, icon: Clock, color: "text-warning", bgColor: "bg-warning/10" },
     { label: "Absent", value: absent, icon: UserMinus, color: "text-destructive", bgColor: "bg-destructive/10" },
   ]
