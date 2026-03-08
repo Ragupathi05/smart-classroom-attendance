@@ -10,7 +10,7 @@ import {
   CartesianGrid,
   Cell,
 } from "recharts"
-import { TrendingUp, TrendingDown, AlertTriangle } from "lucide-react"
+import { TrendingUp, TrendingDown, AlertTriangle, BarChart3, Users, BookOpen } from "lucide-react"
 import { useAppStore } from "@/lib/store"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -68,11 +68,12 @@ const overallStats = {
 
 // Colors for charts - computed values, not CSS variables
 const COLORS = {
-  primary: "#22c55e", // Green (primary)
-  secondary: "#3b82f6", // Blue
-  warning: "#eab308", // Yellow
-  destructive: "#ef4444", // Red
+  primary: "#818cf8", // Indigo (primary)
+  success: "#4ade80", // Green 
+  warning: "#fbbf24", // Amber
+  destructive: "#f87171", // Red
   muted: "#6b7280", // Gray
+  grid: "#374151",
 }
 
 export function Analytics() {
@@ -80,75 +81,77 @@ export function Analytics() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Reports & Analytics</h1>
-        <p className="text-muted-foreground">Comprehensive attendance analytics and insights</p>
+      <div className="animate-fade-in-up">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Reports & Analytics</h1>
+        <p className="mt-1 text-muted-foreground">Comprehensive attendance analytics and insights</p>
       </div>
 
       {/* Overview Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-border bg-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Average Attendance</p>
-                <p className="text-3xl font-bold text-foreground">{overallStats.averageAttendance}%</p>
+        {[
+          {
+            title: "Average Attendance",
+            value: `${overallStats.averageAttendance}%`,
+            icon: TrendingUp,
+            color: "text-primary",
+            bgColor: "bg-primary/10",
+          },
+          {
+            title: "Total Classes",
+            value: overallStats.totalClasses,
+            icon: BookOpen,
+            color: "text-chart-2",
+            bgColor: "bg-chart-2/10",
+          },
+          {
+            title: "Highest Attendance",
+            value: `${overallStats.highestAttendance.value}%`,
+            subtitle: overallStats.highestAttendance.subject,
+            icon: TrendingUp,
+            color: "text-chart-2",
+            bgColor: "bg-chart-2/10",
+          },
+          {
+            title: "Lowest Attendance",
+            value: `${overallStats.lowestAttendance.value}%`,
+            subtitle: overallStats.lowestAttendance.subject,
+            icon: TrendingDown,
+            color: "text-chart-5",
+            bgColor: "bg-chart-5/10",
+          },
+        ].map((stat, index) => (
+          <Card 
+            key={stat.title} 
+            className="group border-border/50 bg-card/80 backdrop-blur-sm transition-all duration-300 hover:border-primary/30 hover:shadow-lg"
+            style={{ animationDelay: `${index * 100}ms` }}
+          >
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">{stat.title}</p>
+                  <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                  {stat.subtitle && (
+                    <p className="text-xs text-muted-foreground">{stat.subtitle}</p>
+                  )}
+                </div>
+                <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.bgColor} transition-transform duration-200 group-hover:scale-110`}>
+                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                </div>
               </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                <TrendingUp className="h-6 w-6 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border bg-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Classes</p>
-                <p className="text-3xl font-bold text-foreground">{overallStats.totalClasses}</p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                <span className="text-lg font-bold text-muted-foreground">Cls</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border bg-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Highest Attendance</p>
-                <p className="text-2xl font-bold text-primary">{overallStats.highestAttendance.value}%</p>
-                <p className="text-xs text-muted-foreground">{overallStats.highestAttendance.subject}</p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                <TrendingUp className="h-6 w-6 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border bg-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Lowest Attendance</p>
-                <p className="text-2xl font-bold text-destructive">{overallStats.lowestAttendance.value}%</p>
-                <p className="text-xs text-muted-foreground">{overallStats.lowestAttendance.subject}</p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-                <TrendingDown className="h-6 w-6 text-destructive" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Charts Row */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Weekly Attendance Trend */}
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-foreground">Weekly Attendance Trend</CardTitle>
+        <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Weekly Attendance Trend
+            </CardTitle>
             <CardDescription className="text-muted-foreground">
               Daily attendance percentage this week
             </CardDescription>
@@ -161,19 +164,20 @@ export function Analytics() {
                   color: COLORS.primary,
                 },
               }}
-              className="h-[300px]"
+              className="h-[280px]"
             >
-              <LineChart data={weeklyTrendData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="day" stroke="#9ca3af" />
-                <YAxis domain={[0, 100]} stroke="#9ca3af" />
+              <LineChart data={weeklyTrendData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} opacity={0.3} />
+                <XAxis dataKey="day" stroke={COLORS.muted} fontSize={12} />
+                <YAxis domain={[0, 100]} stroke={COLORS.muted} fontSize={12} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Line
                   type="monotone"
                   dataKey="attendance"
                   stroke={COLORS.primary}
-                  strokeWidth={2}
-                  dot={{ fill: COLORS.primary, strokeWidth: 2 }}
+                  strokeWidth={3}
+                  dot={{ fill: COLORS.primary, strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6, fill: COLORS.primary }}
                   name="Attendance %"
                 />
               </LineChart>
@@ -182,9 +186,12 @@ export function Analytics() {
         </Card>
 
         {/* Subject-wise Attendance */}
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-foreground">Subject-wise Attendance</CardTitle>
+        <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <BookOpen className="h-5 w-5 text-primary" />
+              Subject-wise Attendance
+            </CardTitle>
             <CardDescription className="text-muted-foreground">
               Attendance percentage by subject
             </CardDescription>
@@ -197,18 +204,18 @@ export function Analytics() {
                   color: COLORS.primary,
                 },
               }}
-              className="h-[300px]"
+              className="h-[280px]"
             >
-              <BarChart data={subjectData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="subject" stroke="#9ca3af" />
-                <YAxis domain={[0, 100]} stroke="#9ca3af" />
+              <BarChart data={subjectData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} opacity={0.3} />
+                <XAxis dataKey="subject" stroke={COLORS.muted} fontSize={12} />
+                <YAxis domain={[0, 100]} stroke={COLORS.muted} fontSize={12} />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="attendance" radius={[4, 4, 0, 0]} name="Attendance %">
+                <Bar dataKey="attendance" radius={[6, 6, 0, 0]} name="Attendance %">
                   {subjectData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={entry.attendance >= 85 ? COLORS.primary : entry.attendance >= 75 ? COLORS.warning : COLORS.destructive}
+                      fill={entry.attendance >= 85 ? COLORS.success : entry.attendance >= 75 ? COLORS.warning : COLORS.destructive}
                     />
                   ))}
                 </Bar>
@@ -219,52 +226,59 @@ export function Analytics() {
       </div>
 
       {/* Students Below 75% */}
-      <Card className="border-border bg-card">
+      <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            <AlertTriangle className="h-5 w-5 text-warning" />
+            <AlertTriangle className="h-5 w-5 text-chart-3" />
             Students Below 75% Attendance
           </CardTitle>
           <CardDescription className="text-muted-foreground">
-            Students who need to improve their attendance
+            Students who need to improve their attendance to meet requirements
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-muted-foreground">Roll No.</TableHead>
-                <TableHead className="text-muted-foreground">Student Name</TableHead>
-                <TableHead className="text-center text-muted-foreground">Classes Attended</TableHead>
-                <TableHead className="text-center text-muted-foreground">Total Classes</TableHead>
-                <TableHead className="text-center text-muted-foreground">Attendance %</TableHead>
-                <TableHead className="text-muted-foreground">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lowAttendanceStudents.map((student) => (
-                <TableRow key={student.rollNumber} className="border-border">
-                  <TableCell className="font-mono text-sm text-muted-foreground">
-                    {student.rollNumber}
-                  </TableCell>
-                  <TableCell className="font-medium text-foreground">{student.name}</TableCell>
-                  <TableCell className="text-center text-foreground">{student.attended}</TableCell>
-                  <TableCell className="text-center text-foreground">{student.classes}</TableCell>
-                  <TableCell className="text-center">
-                    <span className="font-bold text-destructive">{student.attendance}%</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="border-destructive/30 text-destructive">
-                      At Risk
-                    </Badge>
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border/50 hover:bg-transparent">
+                  <TableHead className="text-muted-foreground">Roll No.</TableHead>
+                  <TableHead className="text-muted-foreground">Student Name</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Attended</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Total</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Percentage</TableHead>
+                  <TableHead className="text-muted-foreground">Status</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {lowAttendanceStudents.map((student, index) => (
+                  <TableRow 
+                    key={student.rollNumber} 
+                    className="border-border/50 transition-colors hover:bg-secondary/50"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <TableCell className="font-mono text-sm text-muted-foreground">
+                      {student.rollNumber}
+                    </TableCell>
+                    <TableCell className="font-medium text-foreground">{student.name}</TableCell>
+                    <TableCell className="text-center text-foreground">{student.attended}</TableCell>
+                    <TableCell className="text-center text-foreground">{student.classes}</TableCell>
+                    <TableCell className="text-center">
+                      <span className="font-bold text-chart-5">{student.attendance}%</span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className="border-chart-5/30 bg-chart-5/10 text-chart-5">
+                        At Risk
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
           
           {lowAttendanceStudents.length === 0 && (
             <div className="py-12 text-center">
+              <Users className="mx-auto mb-2 h-10 w-10 text-muted-foreground/30" />
               <p className="text-muted-foreground">No students below 75% attendance</p>
             </div>
           )}

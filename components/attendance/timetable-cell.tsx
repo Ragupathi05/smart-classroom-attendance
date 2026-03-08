@@ -3,7 +3,6 @@
 import { Check, AlertTriangle, Clock, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { type TimetableCell as TimetableCellType } from "@/lib/store"
-import { Badge } from "@/components/ui/badge"
 
 interface TimetableCellProps {
   cell: TimetableCellType
@@ -13,26 +12,42 @@ interface TimetableCellProps {
 }
 
 export function TimetableCell({ cell, onClick, disabled, variant = "default" }: TimetableCellProps) {
-  const statusStyles = {
-    current: "border-primary ring-2 ring-primary/30",
-    submitted: "border-primary/50 bg-primary/10",
-    missed: "border-warning/50 bg-warning/10",
-    upcoming: "border-border hover:border-muted-foreground/50",
+  const statusConfig = {
+    current: {
+      border: "border-primary ring-2 ring-primary/20 shadow-md shadow-primary/10",
+      bg: "bg-primary/5",
+      iconBg: "bg-primary/20",
+      textColor: "text-primary",
+      icon: <Clock className="h-3.5 w-3.5" />,
+      badge: { bg: "bg-primary", text: "text-primary-foreground", label: "Current" },
+    },
+    submitted: {
+      border: "border-chart-2/30",
+      bg: "bg-chart-2/5",
+      iconBg: "bg-chart-2/20",
+      textColor: "text-chart-2",
+      icon: <Check className="h-3.5 w-3.5" />,
+      badge: { bg: "bg-chart-2/10", text: "text-chart-2", label: "Done" },
+    },
+    missed: {
+      border: "border-chart-3/30",
+      bg: "bg-chart-3/5",
+      iconBg: "bg-chart-3/20",
+      textColor: "text-chart-3",
+      icon: <AlertTriangle className="h-3.5 w-3.5" />,
+      badge: { bg: "bg-chart-3/10", text: "text-chart-3", label: "Missed" },
+    },
+    upcoming: {
+      border: "border-border/50 hover:border-primary/30",
+      bg: "bg-card hover:bg-secondary/50",
+      iconBg: "bg-secondary",
+      textColor: "text-foreground",
+      icon: null,
+      badge: { bg: "bg-secondary", text: "text-muted-foreground", label: "Upcoming" },
+    },
   }
 
-  const statusIcons = {
-    current: <Clock className="h-3.5 w-3.5 text-primary" />,
-    submitted: <Check className="h-3.5 w-3.5 text-primary" />,
-    missed: <AlertTriangle className="h-3.5 w-3.5 text-warning" />,
-    upcoming: null,
-  }
-
-  const statusBadges = {
-    current: <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0">Current</Badge>,
-    submitted: <Badge variant="outline" className="border-primary/50 text-primary text-[10px] px-1.5 py-0">Done</Badge>,
-    missed: <Badge variant="outline" className="border-warning/50 text-warning text-[10px] px-1.5 py-0">Missed</Badge>,
-    upcoming: <Badge variant="outline" className="text-muted-foreground text-[10px] px-1.5 py-0">Upcoming</Badge>,
-  }
+  const config = statusConfig[cell.status]
 
   // Mobile variant - horizontal card
   if (variant === "mobile") {
@@ -41,40 +56,38 @@ export function TimetableCell({ cell, onClick, disabled, variant = "default" }: 
         onClick={() => onClick(cell)}
         disabled={disabled || cell.status === "submitted"}
         className={cn(
-          "flex w-full items-center justify-between rounded-lg border bg-card p-3 transition-all",
-          statusStyles[cell.status],
-          cell.status === "current" && "animate-pulse",
+          "group flex w-full items-center justify-between rounded-xl border p-4 transition-all duration-200",
+          config.border,
+          config.bg,
+          cell.status === "current" && "animate-pulse-subtle",
           !disabled && cell.status !== "submitted" && "active:scale-[0.98]",
           disabled && "cursor-not-allowed opacity-50"
         )}
       >
         <div className="flex items-center gap-3">
           <div className={cn(
-            "flex h-10 w-10 items-center justify-center rounded-lg",
-            cell.status === "current" && "bg-primary/20",
-            cell.status === "submitted" && "bg-primary/10",
-            cell.status === "missed" && "bg-warning/20",
-            cell.status === "upcoming" && "bg-muted"
+            "flex h-12 w-12 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105",
+            config.iconBg
           )}>
-            <span className={cn(
-              "text-sm font-bold",
-              cell.status === "current" && "text-primary",
-              cell.status === "submitted" && "text-primary",
-              cell.status === "missed" && "text-warning",
-              cell.status === "upcoming" && "text-foreground"
-            )}>
+            <span className={cn("text-sm font-bold", config.textColor)}>
               {cell.subjectCode}
             </span>
           </div>
           <div className="text-left">
-            <p className="text-sm font-medium text-foreground">{cell.subjectName}</p>
-            <p className="text-xs text-muted-foreground">{cell.timeSlot}</p>
+            <p className="font-semibold text-foreground">{cell.subjectName}</p>
+            <p className="text-sm text-muted-foreground">{cell.timeSlot}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {statusBadges[cell.status]}
+        <div className="flex items-center gap-3">
+          <span className={cn(
+            "rounded-full px-3 py-1 text-xs font-medium",
+            config.badge.bg,
+            config.badge.text
+          )}>
+            {config.badge.label}
+          </span>
           {!disabled && cell.status !== "submitted" && (
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5" />
           )}
         </div>
       </button>
@@ -87,38 +100,34 @@ export function TimetableCell({ cell, onClick, disabled, variant = "default" }: 
       onClick={() => onClick(cell)}
       disabled={disabled || cell.status === "submitted"}
       className={cn(
-        "group relative flex h-full min-h-[80px] w-full flex-col items-center justify-center gap-1 rounded-lg border bg-card p-2 transition-all duration-200",
-        statusStyles[cell.status],
-        cell.status === "current" && "animate-pulse",
-        !disabled && cell.status !== "submitted" && "cursor-pointer hover:scale-[1.02] hover:shadow-md",
+        "group relative flex h-[72px] w-full flex-col items-center justify-center gap-1 rounded-xl border transition-all duration-200",
+        config.border,
+        config.bg,
+        cell.status === "current" && "animate-pulse-subtle",
+        !disabled && cell.status !== "submitted" && "cursor-pointer hover:scale-[1.02] hover:shadow-lg",
         disabled && "cursor-not-allowed opacity-50"
       )}
     >
       {/* Status Icon */}
-      <div className="absolute right-2 top-2">
-        {statusIcons[cell.status]}
-      </div>
+      {config.icon && (
+        <div className={cn(
+          "absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-md",
+          config.iconBg,
+          config.textColor
+        )}>
+          {config.icon}
+        </div>
+      )}
 
       {/* Subject Code */}
-      <span className={cn(
-        "text-lg font-bold",
-        cell.status === "current" && "text-primary",
-        cell.status === "submitted" && "text-primary",
-        cell.status === "missed" && "text-warning",
-        cell.status === "upcoming" && "text-foreground"
-      )}>
+      <span className={cn("text-base font-bold", config.textColor)}>
         {cell.subjectCode}
       </span>
 
-      {/* Subject Name (on hover) */}
-      <span className="text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+      {/* Subject Name (truncated) */}
+      <span className="max-w-[90%] truncate text-[10px] text-muted-foreground">
         {cell.subjectName}
       </span>
-
-      {/* Status Badge */}
-      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
-        {statusBadges[cell.status]}
-      </div>
     </button>
   )
 }
