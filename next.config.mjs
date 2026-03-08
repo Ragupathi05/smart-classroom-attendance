@@ -11,7 +11,6 @@ const nextConfig = {
   },
   output: "export",
   basePath: isProd ? "/smart-classroom-attendance" : "",
-  assetPrefix: isProd ? "/smart-classroom-attendance/" : "",
   trailingSlash: true,
   typescript: {
     ignoreBuildErrors: true,
