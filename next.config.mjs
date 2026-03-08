@@ -1,8 +1,10 @@
 /** @type {import('next').NextConfig} */
+const isProd = process.env.NODE_ENV === "production"
+
 const nextConfig = {
   output: "export",
-  basePath: "/smart-classroom-attendance",
-  assetPrefix: "/smart-classroom-attendance/",
+  basePath: isProd ? "/smart-classroom-attendance" : "",
+  assetPrefix: isProd ? "/smart-classroom-attendance/" : "",
   trailingSlash: true,
   typescript: {
     ignoreBuildErrors: true,
