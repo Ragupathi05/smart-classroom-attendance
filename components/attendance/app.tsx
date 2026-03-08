@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useAppStore } from "@/lib/store"
 import { Sidebar } from "./sidebar"
 import { Header } from "./header"
@@ -11,9 +12,23 @@ import { CorrectionRequests } from "./correction-requests"
 import { Analytics } from "./analytics"
 import { Settings } from "./settings"
 import { Toaster } from "@/components/ui/toaster"
+import { Spinner } from "@/components/ui/spinner"
 
 export function AttendanceApp() {
+  const [mounted, setMounted] = useState(false)
   const { isAuthenticated, currentPage } = useAppStore()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Spinner className="h-8 w-8 text-primary" />
+      </div>
+    )
+  }
 
   if (!isAuthenticated) {
     return (
