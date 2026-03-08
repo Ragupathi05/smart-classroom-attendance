@@ -99,20 +99,20 @@ export function Dashboard() {
                 return (
                   <div
                     key={record.id}
-                    className="flex items-center justify-between rounded-lg border border-border p-4"
+                    className="flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                         <span className="text-sm font-bold text-primary">{record.subjectCode}</span>
                       </div>
-                      <div>
-                        <p className="font-medium text-foreground">{record.subject}</p>
-                        <p className="text-sm text-muted-foreground">{record.timeSlot}</p>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-foreground">{record.subject}</p>
+                        <p className="text-xs text-muted-foreground sm:text-sm">{record.timeSlot}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-3 text-xs sm:gap-4 sm:text-sm">
                       <span className="text-primary">{present} Present</span>
-                      <span className="text-warning">{permission} Permission</span>
+                      <span className="text-warning">{permission} Perm</span>
                       <span className="text-destructive">{absent} Absent</span>
                     </div>
                   </div>
