@@ -8,11 +8,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Legend,
-  ResponsiveContainer,
   Cell,
-  Pie,
-  PieChart,
 } from "recharts"
 import { TrendingUp, TrendingDown, AlertTriangle } from "lucide-react"
 import { useAppStore } from "@/lib/store"
@@ -167,22 +163,20 @@ export function Analytics() {
               }}
               className="h-[300px]"
             >
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={weeklyTrendData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="day" stroke="#9ca3af" />
-                  <YAxis domain={[0, 100]} stroke="#9ca3af" />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line
-                    type="monotone"
-                    dataKey="attendance"
-                    stroke={COLORS.primary}
-                    strokeWidth={2}
-                    dot={{ fill: COLORS.primary, strokeWidth: 2 }}
-                    name="Attendance %"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <LineChart data={weeklyTrendData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="day" stroke="#9ca3af" />
+                <YAxis domain={[0, 100]} stroke="#9ca3af" />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Line
+                  type="monotone"
+                  dataKey="attendance"
+                  stroke={COLORS.primary}
+                  strokeWidth={2}
+                  dot={{ fill: COLORS.primary, strokeWidth: 2 }}
+                  name="Attendance %"
+                />
+              </LineChart>
             </ChartContainer>
           </CardContent>
         </Card>
@@ -205,22 +199,20 @@ export function Analytics() {
               }}
               className="h-[300px]"
             >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={subjectData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="subject" stroke="#9ca3af" />
-                  <YAxis domain={[0, 100]} stroke="#9ca3af" />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="attendance" radius={[4, 4, 0, 0]} name="Attendance %">
-                    {subjectData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={entry.attendance >= 85 ? COLORS.primary : entry.attendance >= 75 ? COLORS.warning : COLORS.destructive}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <BarChart data={subjectData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="subject" stroke="#9ca3af" />
+                <YAxis domain={[0, 100]} stroke="#9ca3af" />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="attendance" radius={[4, 4, 0, 0]} name="Attendance %">
+                  {subjectData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.attendance >= 85 ? COLORS.primary : entry.attendance >= 75 ? COLORS.warning : COLORS.destructive}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
             </ChartContainer>
           </CardContent>
         </Card>
