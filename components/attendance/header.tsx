@@ -17,9 +17,12 @@ import { Badge } from "@/components/ui/badge"
 
 export function Header() {
   const { user, logout } = useAppStore()
-  const [time, setTime] = useState(new Date())
+  const [time, setTime] = useState<Date | null>(null)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
+    setTime(new Date())
     const timer = setInterval(() => {
       setTime(new Date())
     }, 1000)
@@ -49,7 +52,7 @@ export function Header() {
       {/* Left: Date and Class */}
       <div className="flex items-center gap-6">
         <div>
-          <p className="text-sm text-muted-foreground">{formatDate(time)}</p>
+          <p className="text-sm text-muted-foreground">{mounted && time ? formatDate(time) : <span className="opacity-0">Loading date...</span>}</p>
           <p className="text-lg font-semibold text-foreground">{user?.className}</p>
         </div>
       </div>
@@ -59,7 +62,7 @@ export function Header() {
         {/* Digital Clock */}
         <div className="rounded-lg border border-border bg-card px-4 py-2">
           <p className="font-mono text-lg font-bold tabular-nums text-primary">
-            {formatTime(time)}
+            {mounted && time ? formatTime(time) : "--:--:-- --"}
           </p>
         </div>
 
