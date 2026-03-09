@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { useAppStore } from "@/lib/store"
+import { toast } from "react-toastify"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -33,6 +34,7 @@ export function TimetableEditorPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [slotErrorMessage, setSlotErrorMessage] = useState("")
   const [form, setForm] = useState({
     day: DAYS[0],
     timeSlot: TIME_SLOTS[0],
@@ -50,6 +52,7 @@ export function TimetableEditorPage() {
 
   const openAddModal = () => {
     setEditingId(null)
+    setSlotErrorMessage("")
     setForm({ day: DAYS[0], timeSlot: TIME_SLOTS[0], subject: "", faculty: "" })
     setIsModalOpen(true)
   }
@@ -62,6 +65,7 @@ export function TimetableEditorPage() {
     facultyName: string
   ) => {
     setEditingId(id)
+    setSlotErrorMessage("")
     setForm({ day, timeSlot, subject: subjectCode, faculty: facultyName })
     setIsModalOpen(true)
   }
@@ -70,6 +74,24 @@ export function TimetableEditorPage() {
     const subject = form.subject.trim()
     const faculty = form.faculty.trim()
     if (!subject) return
+
+    const conflictingEntry = timetable.find(
+      (entry) =>
+        entry.day === form.day &&
+        entry.timeSlot === form.timeSlot &&
+        entry.id !== editingId
+    )
+
+    if (conflictingEntry) {
+      const message = `Already there is a class in this slot (${conflictingEntry.subjectCode}). Edit or remove that slot, then add.`
+      setSlotErrorMessage(message)
+      toast.warning(
+        message
+      )
+      return
+    }
+
+    setSlotErrorMessage("")
 
     if (editingId) {
       updateTimetableEntry(editingId, {
@@ -88,6 +110,15 @@ export function TimetableEditorPage() {
     }
 
     setIsModalOpen(false)
+  }
+
+  const handleDeleteEntry = (id: string, day: string, timeSlot: string, subjectCode: string) => {
+    const shouldDelete = window.confirm(
+      `Delete ${subjectCode} on ${day} ${timeSlot}? This action cannot be undone.`
+    )
+    if (!shouldDelete) return
+    deleteTimetableEntry(id)
+    toast.success("Timetable entry deleted.")
   }
 
   return (
@@ -155,7 +186,9 @@ export function TimetableEditorPage() {
                           size="sm"
                           variant="outline"
                           className="text-destructive hover:bg-destructive/10"
-                          onClick={() => deleteTimetableEntry(entry.id)}
+                          onClick={() =>
+                            handleDeleteEntry(entry.id, entry.day, entry.timeSlot, entry.subjectCode)
+                          }
                         >
                           <Trash2 className="mr-1 h-3.5 w-3.5" />
                           Delete
@@ -182,7 +215,10 @@ export function TimetableEditorPage() {
               <label className="mb-1 block text-sm font-medium text-foreground">Day</label>
               <select
                 value={form.day}
-                onChange={(e) => setForm((prev) => ({ ...prev, day: e.target.value }))}
+                onChange={(e) => {
+                  setSlotErrorMessage("")
+                  setForm((prev) => ({ ...prev, day: e.target.value }))
+                }}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               >
                 {DAYS.map((day) => (
@@ -197,7 +233,10 @@ export function TimetableEditorPage() {
               <label className="mb-1 block text-sm font-medium text-foreground">Time Slot</label>
               <select
                 value={form.timeSlot}
-                onChange={(e) => setForm((prev) => ({ ...prev, timeSlot: e.target.value }))}
+                onChange={(e) => {
+                  setSlotErrorMessage("")
+                  setForm((prev) => ({ ...prev, timeSlot: e.target.value }))
+                }}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               >
                 {TIME_SLOTS.map((slot) => (
@@ -212,7 +251,10 @@ export function TimetableEditorPage() {
               <label className="mb-1 block text-sm font-medium text-foreground">Subject</label>
               <input
                 value={form.subject}
-                onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
+                onChange={(e) => {
+                  setSlotErrorMessage("")
+                  setForm((prev) => ({ ...prev, subject: e.target.value }))
+                }}
                 placeholder="Enter subject code (e.g., DL)"
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               />
@@ -222,11 +264,20 @@ export function TimetableEditorPage() {
               <label className="mb-1 block text-sm font-medium text-foreground">Faculty</label>
               <input
                 value={form.faculty}
-                onChange={(e) => setForm((prev) => ({ ...prev, faculty: e.target.value }))}
+                onChange={(e) => {
+                  setSlotErrorMessage("")
+                  setForm((prev) => ({ ...prev, faculty: e.target.value }))
+                }}
                 placeholder="Enter faculty name (optional)"
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               />
             </div>
+
+            {slotErrorMessage ? (
+              <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+                {slotErrorMessage}
+              </p>
+            ) : null}
           </div>
 
           <DialogFooter>

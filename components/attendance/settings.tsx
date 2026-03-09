@@ -1,6 +1,7 @@
 "use client"
 
-import { Bell, Moon, Sun, User, Shield, School } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Bell, User, Shield, School, CalendarDays, Users } from "lucide-react"
 import { useAppStore } from "@/lib/store"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,9 +10,31 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { toast } from "react-toastify"
 
 export function Settings() {
-  const { user, setCurrentPage } = useAppStore()
+  const { user, setCurrentPage, appSettings, updateAppSettings, updateUserProfile } = useAppStore()
+  const [name, setName] = useState(user?.name || "")
+  const [email, setEmail] = useState(user?.email || "")
+
+  useEffect(() => {
+    setName(user?.name || "")
+    setEmail(user?.email || "")
+  }, [user?.name, user?.email])
+
+  const handleSaveProfile = () => {
+    const result = updateUserProfile({ name, email })
+    if (!result.success) {
+      toast.error(result.message)
+      return
+    }
+    toast.success(result.message)
+  }
+
+  const handleToggle = (key: keyof typeof appSettings, value: boolean) => {
+    updateAppSettings({ [key]: value })
+    toast.success("Settings updated")
+  }
 
   return (
     <div className="space-y-6">
@@ -39,7 +62,7 @@ export function Settings() {
               </AvatarFallback>
             </Avatar>
             <div>
-              <Button variant="outline" size="sm">Change Avatar</Button>
+              <Button variant="outline" size="sm" onClick={() => toast.info("Avatar upload will be enabled soon")}>Change Avatar</Button>
             </div>
           </div>
           
@@ -48,11 +71,17 @@ export function Settings() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name" className="text-foreground">Full Name</Label>
-              <Input id="name" defaultValue={user?.name} className="bg-input" />
+              <Input id="name" value={name} onChange={(event) => setName(event.target.value)} className="bg-input" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email" className="text-foreground">Email</Label>
-              <Input id="email" type="email" defaultValue="user@college.edu" className="bg-input" />
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="bg-input"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="role" className="text-foreground">Role</Label>
@@ -75,7 +104,7 @@ export function Settings() {
             </div>
           </div>
           
-          <Button>Save Changes</Button>
+          <Button onClick={handleSaveProfile}>Save Changes</Button>
         </CardContent>
       </Card>
 
@@ -98,7 +127,10 @@ export function Settings() {
                 Automatically mark all students as present by default
               </p>
             </div>
-            <Switch defaultChecked />
+            <Switch
+              checked={appSettings.autoSelectPresent}
+              onCheckedChange={(checked) => handleToggle("autoSelectPresent", checked)}
+            />
           </div>
           <Separator className="bg-border" />
           <div className="flex items-center justify-between">
@@ -108,7 +140,10 @@ export function Settings() {
                 Allow attendance modifications within 1 hour after submission
               </p>
             </div>
-            <Switch defaultChecked />
+            <Switch
+              checked={appSettings.allowLateModifications}
+              onCheckedChange={(checked) => handleToggle("allowLateModifications", checked)}
+            />
           </div>
           <Separator className="bg-border" />
           <div className="flex items-center justify-between">
@@ -118,7 +153,10 @@ export function Settings() {
                 Show confirmation dialog before submitting attendance
               </p>
             </div>
-            <Switch defaultChecked />
+            <Switch
+              checked={appSettings.requireConfirmation}
+              onCheckedChange={(checked) => handleToggle("requireConfirmation", checked)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -142,7 +180,10 @@ export function Settings() {
                 Get notified 5 minutes before each class
               </p>
             </div>
-            <Switch defaultChecked />
+            <Switch
+              checked={appSettings.classReminders}
+              onCheckedChange={(checked) => handleToggle("classReminders", checked)}
+            />
           </div>
           <Separator className="bg-border" />
           <div className="flex items-center justify-between">
@@ -152,7 +193,10 @@ export function Settings() {
                 Alert when attendance drops below 75%
               </p>
             </div>
-            <Switch defaultChecked />
+            <Switch
+              checked={appSettings.attendanceAlerts}
+              onCheckedChange={(checked) => handleToggle("attendanceAlerts", checked)}
+            />
           </div>
           <Separator className="bg-border" />
           <div className="flex items-center justify-between">
@@ -162,7 +206,10 @@ export function Settings() {
                 Receive weekly attendance reports via email
               </p>
             </div>
-            <Switch />
+            <Switch
+              checked={appSettings.emailReports}
+              onCheckedChange={(checked) => handleToggle("emailReports", checked)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -186,7 +233,7 @@ export function Settings() {
                 Update your account password
               </p>
             </div>
-            <Button variant="outline" size="sm">Change</Button>
+            <Button variant="outline" size="sm" onClick={() => toast.info("Password reset flow will be connected to backend")}>Change</Button>
           </div>
           <Separator className="bg-border" />
           <div className="flex items-center justify-between">
@@ -196,20 +243,44 @@ export function Settings() {
                 Add an extra layer of security
               </p>
             </div>
-            <Button variant="outline" size="sm">Enable</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleToggle("twoFactorEnabled", !appSettings.twoFactorEnabled)}
+            >
+              {appSettings.twoFactorEnabled ? "Disable" : "Enable"}
+            </Button>
           </div>
         </CardContent>
       </Card>
 
       <Card className="border-border bg-card">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-foreground">Timetable Management</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+            <CalendarDays className="h-5 w-5" />
+            Timetable Management
+          </CardTitle>
           <CardDescription className="text-muted-foreground">
             Open the timetable editor to add, edit, or delete schedule entries
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Button onClick={() => setCurrentPage("timetable-editor")}>Open Timetable Editor</Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+            <Users className="h-5 w-5" />
+            Student Management
+          </CardTitle>
+          <CardDescription className="text-muted-foreground">
+            Open student manager to add, edit, delete, or import class list
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => setCurrentPage("student-manager")}>Open Student Manager</Button>
         </CardContent>
       </Card>
     </div>

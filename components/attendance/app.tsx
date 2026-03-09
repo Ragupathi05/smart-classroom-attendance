@@ -12,6 +12,7 @@ import { CorrectionRequests } from "./correction-requests"
 import { Analytics } from "./analytics"
 import { Settings } from "./settings"
 import { TimetableEditorPage } from "./timetable-editor-page"
+import { StudentManagerPage } from "./student-manager-page"
 import { Toaster } from "@/components/ui/toaster"
 import { Spinner } from "@/components/ui/spinner"
 import { ToastContainer } from "react-toastify"
@@ -69,6 +70,8 @@ export function AttendanceApp() {
         return <Settings />
       case "timetable-editor":
         return <TimetableEditorPage />
+      case "student-manager":
+        return <StudentManagerPage />
       default:
         return <Dashboard />
     }

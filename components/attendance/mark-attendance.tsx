@@ -23,12 +23,13 @@ export function MarkAttendance() {
     attendanceRecords,
     activeRecordId,
     students,
+    appSettings,
   } = useAppStore()
   const [showShareModal, setShowShareModal] = useState(false)
   const [shareData, setShareData] = useState<ShareAttendanceData | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
-  const classFacultyName = selectedCell.facultyName || "Faculty Assigned"
+  const classFacultyName = selectedCell?.facultyName || "Faculty Assigned"
   const activeRecord = attendanceRecords.find((record) => record.id === activeRecordId)
   const getActorLabel = (value?: string) => value?.split(" - ")[0] || "N/A"
 
@@ -42,6 +43,16 @@ export function MarkAttendance() {
 
   const handleSubmit = () => {
     if (!selectedCell) return
+
+    if (appSettings.requireConfirmation) {
+      const shouldContinue = window.confirm(
+        isViewingSubmittedAttendance && isEditMode
+          ? "Are you sure you want to update this attendance record?"
+          : "Are you sure you want to submit attendance for this class?"
+      )
+
+      if (!shouldContinue) return
+    }
 
     try {
       const snapshotStudents = students.map((student) => ({ ...student }))

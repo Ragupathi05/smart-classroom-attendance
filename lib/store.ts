@@ -11,6 +11,17 @@ export interface User {
   name: string
   role: UserRole
   className: string
+  email?: string
+}
+
+export interface AppSettings {
+  autoSelectPresent: boolean
+  allowLateModifications: boolean
+  requireConfirmation: boolean
+  classReminders: boolean
+  attendanceAlerts: boolean
+  emailReports: boolean
+  twoFactorEnabled: boolean
 }
 
 export interface Student {
@@ -74,6 +85,7 @@ interface AppState {
   isAuthenticated: boolean
   currentPage: string
   students: Student[]
+  classStudents: Student[]
   attendanceRecords: AttendanceRecord[]
   notifications: AppNotification[]
   correctionRequests: CorrectionRequest[]
@@ -83,6 +95,7 @@ interface AppState {
   isViewingSubmittedAttendance: boolean
   isEditMode: boolean
   timetableWeekKey: string
+  appSettings: AppSettings
 
   login: (userId: string, password: string, role: UserRole) => boolean
   logout: () => void
@@ -107,9 +120,28 @@ interface AppState {
   addTimetableEntry: (entry: { day: string; timeSlot: string; subjectCode: string; facultyName: string }) => void
   updateTimetableEntry: (id: string, entry: { day: string; timeSlot: string; subjectCode: string; facultyName: string }) => void
   deleteTimetableEntry: (id: string) => void
+  addClassStudent: (entry: { rollNumber: string; name: string }) => { success: boolean; message: string }
+  updateClassStudent: (id: string, entry: { rollNumber: string; name: string }) => { success: boolean; message: string }
+  deleteClassStudent: (id: string) => void
+  importClassStudents: (entries: Array<{ rollNumber: string; name: string }>) => {
+    added: number
+    skipped: number
+  }
+  updateAppSettings: (settings: Partial<AppSettings>) => void
+  updateUserProfile: (payload: { name: string; email: string }) => { success: boolean; message: string }
 }
 
 const ATTENDANCE_STORAGE_KEY = "attendanceRecords"
+
+const defaultAppSettings: AppSettings = {
+  autoSelectPresent: true,
+  allowLateModifications: true,
+  requireConfirmation: true,
+  classReminders: true,
+  attendanceAlerts: true,
+  emailReports: false,
+  twoFactorEnabled: false,
+}
 
 const loadAttendanceRecordsFromStorage = (): AttendanceRecord[] => {
   if (typeof window === "undefined") return []
@@ -195,8 +227,13 @@ const weeklySchedule: Record<string, string[]> = {
   Saturday: ["RL", "CCAI", "MM", "", "", "", ""],
 }
 
-const cloneStudents = (): Student[] =>
-  csmStudents.map((student) => ({ ...student, status: "present" }))
+const withPresentStatus = (students: Student[]): Student[] =>
+  students.map((student) => ({ ...student, status: "present" }))
+
+const cloneStudents = (): Student[] => withPresentStatus(csmStudents)
+
+const normalizeRoll = (rollNumber: string) => rollNumber.trim().toUpperCase()
+const normalizeName = (name: string) => name.trim().replace(/\s+/g, " ")
 
 const generateTimetable = (): TimetableCell[] => {
   const timetable: TimetableCell[] = []
@@ -302,6 +339,7 @@ export const useAppStore = create<AppState>()(
       isAuthenticated: false,
       currentPage: "dashboard",
       students: cloneStudents(),
+      classStudents: cloneStudents(),
       attendanceRecords: loadAttendanceRecordsFromStorage(),
       notifications: [],
       correctionRequests: initialCorrectionRequests,
@@ -311,6 +349,7 @@ export const useAppStore = create<AppState>()(
       isViewingSubmittedAttendance: false,
       isEditMode: false,
       timetableWeekKey: getISOWeekKey(),
+      appSettings: defaultAppSettings,
 
       login: (userId, password, role) => {
         if (!userId || !password) return false
@@ -329,6 +368,7 @@ export const useAppStore = create<AppState>()(
             name: roleNames[role],
             role,
             className: CLASS_NAME,
+            email: `${userId}@college.edu`,
           },
           isAuthenticated: true,
           currentPage: "dashboard",
@@ -342,7 +382,7 @@ export const useAppStore = create<AppState>()(
           user: null,
           isAuthenticated: false,
           currentPage: "dashboard",
-          students: cloneStudents(),
+          students: withPresentStatus(get().classStudents),
           selectedCell: null,
         })
       },
@@ -353,7 +393,7 @@ export const useAppStore = create<AppState>()(
           if (state.currentPage === "mark-attendance" && page !== "mark-attendance") {
             return {
               currentPage: page,
-              students: cloneStudents(),
+              students: withPresentStatus(state.classStudents),
               selectedCell: null,
               activeRecordId: null,
               isViewingSubmittedAttendance: false,
@@ -408,7 +448,7 @@ export const useAppStore = create<AppState>()(
                 },
                 ...prev.notifications,
               ],
-              students: cloneStudents(),
+              students: withPresentStatus(prev.classStudents),
               selectedCell: null,
               activeRecordId: null,
               isViewingSubmittedAttendance: false,
@@ -466,7 +506,7 @@ export const useAppStore = create<AppState>()(
           if (cell.status !== "submitted") {
             return {
               selectedCell: cell,
-              students: cloneStudents(),
+              students: withPresentStatus(state.classStudents),
               activeRecordId: null,
               isViewingSubmittedAttendance: false,
               isEditMode: false,
@@ -477,7 +517,7 @@ export const useAppStore = create<AppState>()(
           if (!record) {
             return {
               selectedCell: cell,
-              students: cloneStudents(),
+              students: withPresentStatus(state.classStudents),
               activeRecordId: null,
               isViewingSubmittedAttendance: false,
               isEditMode: false,
@@ -504,7 +544,7 @@ export const useAppStore = create<AppState>()(
 
           return {
             timetable: resetTimetableStatuses(state.timetable),
-            students: cloneStudents(),
+            students: withPresentStatus(state.classStudents),
             selectedCell: null,
             activeRecordId: null,
             isViewingSubmittedAttendance: false,
@@ -760,10 +800,183 @@ export const useAppStore = create<AppState>()(
         if (savedRecords.length === 0) return
         set({ attendanceRecords: savedRecords })
       },
+
+      addClassStudent: ({ rollNumber, name }) => {
+        const normalizedRoll = normalizeRoll(rollNumber)
+        const normalizedName = normalizeName(name)
+        if (!normalizedRoll || !normalizedName) {
+          return { success: false, message: "Roll number and name are required." }
+        }
+
+        const state = get()
+        const duplicate = state.classStudents.some(
+          (student) => normalizeRoll(student.rollNumber) === normalizedRoll
+        )
+        if (duplicate) {
+          return { success: false, message: "Roll number already exists." }
+        }
+
+        const newStudent: Student = {
+          id: `student-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          rollNumber: normalizedRoll,
+          name: normalizedName,
+          status: "present",
+        }
+
+        set((prev) => {
+          const nextClassStudents = [...prev.classStudents, newStudent].sort((a, b) =>
+            a.rollNumber.localeCompare(b.rollNumber)
+          )
+
+          return {
+            classStudents: nextClassStudents,
+            students: withPresentStatus(nextClassStudents),
+          }
+        })
+
+        return { success: true, message: "Student added successfully." }
+      },
+
+      updateClassStudent: (id, { rollNumber, name }) => {
+        const normalizedRoll = normalizeRoll(rollNumber)
+        const normalizedName = normalizeName(name)
+        if (!normalizedRoll || !normalizedName) {
+          return { success: false, message: "Roll number and name are required." }
+        }
+
+        const state = get()
+        const duplicate = state.classStudents.some(
+          (student) => student.id !== id && normalizeRoll(student.rollNumber) === normalizedRoll
+        )
+        if (duplicate) {
+          return { success: false, message: "Roll number already exists." }
+        }
+
+        set((prev) => {
+          const nextClassStudents = prev.classStudents
+            .map((student) =>
+              student.id === id
+                ? { ...student, rollNumber: normalizedRoll, name: normalizedName }
+                : student
+            )
+            .sort((a, b) => a.rollNumber.localeCompare(b.rollNumber))
+
+          const nextStudents = withPresentStatus(nextClassStudents)
+          const nextRecords = prev.attendanceRecords.map((record) => ({
+            ...record,
+            students: record.students.map((student) =>
+              student.id === id
+                ? { ...student, rollNumber: normalizedRoll, name: normalizedName }
+                : student
+            ),
+          }))
+
+          saveAttendanceRecordsToStorage(nextRecords)
+
+          return {
+            classStudents: nextClassStudents,
+            students: nextStudents,
+            attendanceRecords: nextRecords,
+          }
+        })
+
+        return { success: true, message: "Student updated successfully." }
+      },
+
+      deleteClassStudent: (id) =>
+        set((prev) => {
+          const nextClassStudents = prev.classStudents.filter((student) => student.id !== id)
+          const nextStudents = withPresentStatus(nextClassStudents)
+          const nextRecords = prev.attendanceRecords.map((record) => ({
+            ...record,
+            students: record.students.filter((student) => student.id !== id),
+          }))
+
+          saveAttendanceRecordsToStorage(nextRecords)
+
+          return {
+            classStudents: nextClassStudents,
+            students: nextStudents,
+            attendanceRecords: nextRecords,
+          }
+        }),
+
+      importClassStudents: (entries) => {
+        const state = get()
+        const existingRolls = new Set(state.classStudents.map((student) => normalizeRoll(student.rollNumber)))
+        const toAdd: Student[] = []
+        let skipped = 0
+
+        for (const entry of entries) {
+          const normalizedRoll = normalizeRoll(entry.rollNumber)
+          const normalizedName = normalizeName(entry.name)
+          if (!normalizedRoll || !normalizedName || existingRolls.has(normalizedRoll)) {
+            skipped += 1
+            continue
+          }
+
+          existingRolls.add(normalizedRoll)
+          toAdd.push({
+            id: `student-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            rollNumber: normalizedRoll,
+            name: normalizedName,
+            status: "present",
+          })
+        }
+
+        if (toAdd.length > 0) {
+          set((prev) => {
+            const nextClassStudents = [...prev.classStudents, ...toAdd].sort((a, b) =>
+              a.rollNumber.localeCompare(b.rollNumber)
+            )
+
+            return {
+              classStudents: nextClassStudents,
+              students: withPresentStatus(nextClassStudents),
+            }
+          })
+        }
+
+        return { added: toAdd.length, skipped }
+      },
+
+      updateAppSettings: (settings) =>
+        set((state) => ({
+          appSettings: {
+            ...state.appSettings,
+            ...settings,
+          },
+        })),
+
+      updateUserProfile: ({ name, email }) => {
+        const trimmedName = name.trim()
+        const trimmedEmail = email.trim().toLowerCase()
+
+        if (!trimmedName || !trimmedEmail) {
+          return { success: false, message: "Name and email are required." }
+        }
+
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailPattern.test(trimmedEmail)) {
+          return { success: false, message: "Please enter a valid email address." }
+        }
+
+        set((state) => ({
+          user: state.user
+            ? {
+                ...state.user,
+                name: trimmedName,
+                email: trimmedEmail,
+              }
+            : state.user,
+        }))
+
+        return { success: true, message: "Profile settings updated." }
+      },
     }),
     {
       name: "attendance-app-store-v1",
-      version: 4,
+      version: 6,
       storage: createJSONStorage(() => localStorage),
       migrate: (persistedState: any) => {
         if (!persistedState) return persistedState
@@ -775,7 +988,29 @@ export const useAppStore = create<AppState>()(
 
         return {
           ...persistedState,
+          classStudents: Array.isArray(persistedState.classStudents)
+            ? persistedState.classStudents.map((student: Student) => ({
+                ...student,
+                status: "present" as const,
+              }))
+            : cloneStudents(),
+          students: Array.isArray(persistedState.classStudents)
+            ? persistedState.classStudents.map((student: Student) => ({
+                ...student,
+                status: "present" as const,
+              }))
+            : cloneStudents(),
           timetable: generateTimetable(),
+          appSettings: {
+            ...defaultAppSettings,
+            ...(persistedState.appSettings || {}),
+          },
+          user: persistedState.user
+            ? {
+                ...persistedState.user,
+                email: persistedState.user.email || `${persistedState.user.id || "user"}@college.edu`,
+              }
+            : persistedState.user,
           notifications: persistedState.notifications || [],
           correctionRequests: persistedCorrections,
           activeRecordId: null,

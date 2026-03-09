@@ -8,6 +8,7 @@ import {
   BarChart3,
   Settings,
   CalendarDays,
+  Users,
   LogOut,
   GraduationCap,
   X,
@@ -24,6 +25,7 @@ const navigation = [
   { name: "Analytics", icon: BarChart3, page: "analytics" },
   { name: "Settings", icon: Settings, page: "settings" },
   { name: "Timetable Editor", icon: CalendarDays, page: "timetable-editor" },
+  { name: "Student Manager", icon: Users, page: "student-manager" },
 ]
 
 interface SidebarProps {
@@ -88,6 +90,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             
             // Hide mark attendance for faculty
             if (item.page === "mark-attendance" && user?.role === "faculty") {
+              return null
+            }
+
+            if (item.page === "student-manager" && user?.role === "faculty") {
               return null
             }
             
