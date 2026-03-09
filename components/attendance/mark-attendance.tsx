@@ -9,7 +9,8 @@ import { StudentList } from "./student-list"
 import { ShareAttendanceModal, type ShareAttendanceData } from "./share-attendance-modal"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { useToast } from "@/hooks/use-toast"
+import { ToastContainer, toast } from "react-toastify"
+import "react-toastify/dist/ReactToastify.css"
 
 export function MarkAttendance() {
   const {
@@ -27,7 +28,6 @@ export function MarkAttendance() {
   const [showShareModal, setShowShareModal] = useState(false)
   const [shareData, setShareData] = useState<ShareAttendanceData | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const { toast } = useToast()
 
   const classFacultyName = "Mr. P. Udayakumar"
   const activeRecord = attendanceRecords.find((record) => record.id === activeRecordId)
@@ -37,42 +37,41 @@ export function MarkAttendance() {
     setIsSaving(true)
     setTimeout(() => {
       setIsSaving(false)
-      toast({
-        title: "Draft Saved",
-        description: "Attendance draft has been saved successfully.",
-      })
+      toast.success("Attendance draft saved successfully")
     }, 500)
   }
 
   const handleSubmit = () => {
     if (!selectedCell) return
 
-    const snapshotStudents = students.map((student) => ({ ...student }))
-    const absentStudents = snapshotStudents.filter((student) => student.status === "absent")
-    const presentCount = snapshotStudents.filter((student) => student.status === "present").length
-    const permissionCount = snapshotStudents.filter((student) => student.status === "permission").length
+    try {
+      const snapshotStudents = students.map((student) => ({ ...student }))
+      const absentStudents = snapshotStudents.filter((student) => student.status === "absent")
+      const presentCount = snapshotStudents.filter((student) => student.status === "present").length
+      const permissionCount = snapshotStudents.filter((student) => student.status === "permission").length
 
-    const reportData: ShareAttendanceData = {
-      subject: `${selectedCell.subjectName} (${selectedCell.subjectCode})`,
-      date: new Date().toISOString().split("T")[0],
-      presentCount,
-      permissionCount,
-      absentCount: absentStudents.length,
-      absentStudents,
+      const reportData: ShareAttendanceData = {
+        subject: `${selectedCell.subjectName} (${selectedCell.subjectCode})`,
+        date: new Date().toISOString().split("T")[0],
+        presentCount,
+        permissionCount,
+        absentCount: absentStudents.length,
+        absentStudents,
+      }
+
+      submitAttendance(selectedCell)
+
+      if (isViewingSubmittedAttendance && isEditMode) {
+        toast.success("Attendance updated successfully")
+        return
+      }
+
+      toast.success("Attendance submitted successfully!")
+      setShareData(reportData)
+      setShowShareModal(true)
+    } catch {
+      toast.error("Failed to submit attendance")
     }
-
-    submitAttendance(selectedCell)
-
-    if (isViewingSubmittedAttendance && isEditMode) {
-      toast({
-        title: "Attendance Updated",
-        description: "Changes were saved and the respective faculty has been notified.",
-      })
-      return
-    }
-
-    setShareData(reportData)
-    setShowShareModal(true)
   }
 
   const handleCloseModal = () => {
@@ -203,6 +202,15 @@ export function MarkAttendance() {
 
       {/* Share Modal */}
       <ShareAttendanceModal open={showShareModal} onClose={handleCloseModal} data={shareData} />
+
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+      />
     </div>
   )
 }
