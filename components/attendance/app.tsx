@@ -11,18 +11,22 @@ import { AttendanceHistory } from "./attendance-history"
 import { CorrectionRequests } from "./correction-requests"
 import { Analytics } from "./analytics"
 import { Settings } from "./settings"
+import { TimetableEditorPage } from "./timetable-editor-page"
 import { Toaster } from "@/components/ui/toaster"
 import { Spinner } from "@/components/ui/spinner"
+import { ToastContainer } from "react-toastify"
+import "react-toastify/dist/ReactToastify.css"
 
 export function AttendanceApp() {
   const [mounted, setMounted] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { isAuthenticated, currentPage, ensureWeeklyTimetableReset } = useAppStore()
+  const { isAuthenticated, currentPage, ensureWeeklyTimetableReset, hydrateAttendanceRecords } = useAppStore()
 
   useEffect(() => {
     ensureWeeklyTimetableReset()
+    hydrateAttendanceRecords()
     setMounted(true)
-  }, [ensureWeeklyTimetableReset])
+  }, [ensureWeeklyTimetableReset, hydrateAttendanceRecords])
 
   if (!mounted) {
     return (
@@ -37,6 +41,14 @@ export function AttendanceApp() {
       <>
         <LoginPage />
         <Toaster />
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          pauseOnHover
+        />
       </>
     )
   }
@@ -55,6 +67,8 @@ export function AttendanceApp() {
         return <Analytics />
       case "settings":
         return <Settings />
+      case "timetable-editor":
+        return <TimetableEditorPage />
       default:
         return <Dashboard />
     }
@@ -68,6 +82,14 @@ export function AttendanceApp() {
         <div className="p-4 sm:p-6">{renderPage()}</div>
       </main>
       <Toaster />
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+      />
     </div>
   )
 }

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 export function Settings() {
-  const { user } = useAppStore()
+  const { user, setCurrentPage } = useAppStore()
 
   return (
     <div className="space-y-6">
@@ -198,6 +198,18 @@ export function Settings() {
             </div>
             <Button variant="outline" size="sm">Enable</Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-foreground">Timetable Management</CardTitle>
+          <CardDescription className="text-muted-foreground">
+            Open the timetable editor to add, edit, or delete schedule entries
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => setCurrentPage("timetable-editor")}>Open Timetable Editor</Button>
         </CardContent>
       </Card>
     </div>

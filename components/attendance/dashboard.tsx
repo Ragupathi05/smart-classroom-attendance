@@ -74,7 +74,7 @@ export function Dashboard() {
           return (
             <Card 
               key={stat.title} 
-              className="group border-border/50 bg-card/80 backdrop-blur-sm transition-all duration-300 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
+              className="group border-border/50 bg-card/80 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
               style={{ animationDelay: `${index * 100}ms` }}
             >
               <CardContent className="flex items-center gap-4 p-5">
@@ -116,7 +116,7 @@ export function Dashboard() {
                 return (
                   <div
                     key={record.id}
-                    className="group flex flex-col gap-3 rounded-xl border border-border/50 bg-secondary/30 p-4 transition-all duration-200 hover:border-primary/30 hover:bg-secondary/50 sm:flex-row sm:items-center sm:justify-between"
+                    className="group flex flex-col gap-3 rounded-xl border border-border/50 bg-secondary/30 p-4 transition-all duration-200 hover:-translate-y-1 hover:border-primary/30 hover:bg-secondary/50 hover:shadow-lg sm:flex-row sm:items-center sm:justify-between"
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <div className="flex items-center gap-3">

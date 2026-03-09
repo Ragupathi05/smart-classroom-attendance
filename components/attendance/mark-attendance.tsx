@@ -9,8 +9,7 @@ import { StudentList } from "./student-list"
 import { ShareAttendanceModal, type ShareAttendanceData } from "./share-attendance-modal"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ToastContainer, toast } from "react-toastify"
-import "react-toastify/dist/ReactToastify.css"
+import { toast } from "react-toastify"
 
 export function MarkAttendance() {
   const {
@@ -29,7 +28,7 @@ export function MarkAttendance() {
   const [shareData, setShareData] = useState<ShareAttendanceData | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
-  const classFacultyName = "Mr. P. Udayakumar"
+  const classFacultyName = selectedCell.facultyName || "Faculty Assigned"
   const activeRecord = attendanceRecords.find((record) => record.id === activeRecordId)
   const getActorLabel = (value?: string) => value?.split(" - ")[0] || "N/A"
 
@@ -202,15 +201,6 @@ export function MarkAttendance() {
 
       {/* Share Modal */}
       <ShareAttendanceModal open={showShareModal} onClose={handleCloseModal} data={shareData} />
-
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        pauseOnHover
-      />
     </div>
   )
 }

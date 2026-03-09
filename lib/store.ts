@@ -63,6 +63,7 @@ export interface TimetableCell {
   id: string
   subjectCode: string
   subjectName: string
+  facultyName: string
   day: string
   timeSlot: string
   status: "current" | "submitted" | "missed" | "upcoming"
@@ -102,6 +103,35 @@ interface AppState {
   updateAttendanceRecordFromHistory: (recordId: string, updatedStudents: Student[]) => void
   approveCorrectionRequest: (requestId: string) => void
   rejectCorrectionRequest: (requestId: string) => void
+  hydrateAttendanceRecords: () => void
+  addTimetableEntry: (entry: { day: string; timeSlot: string; subjectCode: string; facultyName: string }) => void
+  updateTimetableEntry: (id: string, entry: { day: string; timeSlot: string; subjectCode: string; facultyName: string }) => void
+  deleteTimetableEntry: (id: string) => void
+}
+
+const ATTENDANCE_STORAGE_KEY = "attendanceRecords"
+
+const loadAttendanceRecordsFromStorage = (): AttendanceRecord[] => {
+  if (typeof window === "undefined") return []
+
+  try {
+    const raw = localStorage.getItem(ATTENDANCE_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+const saveAttendanceRecordsToStorage = (records: AttendanceRecord[]) => {
+  if (typeof window === "undefined") return
+
+  try {
+    localStorage.setItem(ATTENDANCE_STORAGE_KEY, JSON.stringify(records))
+  } catch {
+    // Ignore storage failures (quota/private mode)
+  }
 }
 
 const CLASS_NAME = "III B.TECH CSE (AI & ML) - II SEM"
@@ -137,6 +167,25 @@ const subjectNames: Record<string, string> = {
   MM: "Mentor - Mentee",
 }
 
+const subjectFacultyNames: Record<string, string> = {
+  BDA: "Dr. K. Raman",
+  CCAI: "Dr. V. Saranya",
+  DL: "Mr. P. Udayakumar",
+  ATCD: "Dr. R. Prakash",
+  RL: "Dr. S. Karthik",
+  EB: "Dr. M. Divya",
+  RM: "Dr. A. Nirmala",
+  "BDCC LAB": "Ms. N. Priyanka",
+  "DL LAB": "Mr. P. Udayakumar",
+  SS: "Ms. B. Kavitha",
+  "SS (SEC)": "Ms. B. Kavitha",
+  "SS LAB (SEC)": "Ms. B. Kavitha",
+  "T LAB": "Mr. R. Manoj",
+  APTITUDE: "Mr. S. Hari",
+  VERBAL: "Ms. L. Keerthana",
+  MM: "Class Mentor",
+}
+
 const weeklySchedule: Record<string, string[]> = {
   Monday: ["DL", "SS", "EB", "CCAI", "DL LAB", "DL LAB", "DL LAB"],
   Tuesday: ["CCAI", "SS (SEC)", "MM", "RL", "BDA", "ATCD", "RM"],
@@ -162,6 +211,7 @@ const generateTimetable = (): TimetableCell[] => {
         timeSlot: timeSlots[index],
         subjectCode,
         subjectName: subjectNames[subjectCode] ?? subjectCode,
+        facultyName: subjectFacultyNames[subjectCode] ?? "Faculty Assigned",
         status: "upcoming",
       })
     })
@@ -169,6 +219,9 @@ const generateTimetable = (): TimetableCell[] => {
 
   return timetable
 }
+
+const resetTimetableStatuses = (timetable: TimetableCell[]): TimetableCell[] =>
+  timetable.map((entry) => ({ ...entry, status: "upcoming" }))
 
 const getContiguousSubjectIds = (timetable: TimetableCell[], selected: TimetableCell): string[] => {
   const dayEntries = timetable
@@ -249,7 +302,7 @@ export const useAppStore = create<AppState>()(
       isAuthenticated: false,
       currentPage: "dashboard",
       students: cloneStudents(),
-      attendanceRecords: [],
+      attendanceRecords: loadAttendanceRecordsFromStorage(),
       notifications: [],
       correctionRequests: initialCorrectionRequests,
       timetable: generateTimetable(),
@@ -327,8 +380,8 @@ export const useAppStore = create<AppState>()(
           const editedAt = new Date().toISOString()
           const editedBy = `${state.user?.role.toUpperCase()} - ${state.user?.name}`
 
-          set((prev) => ({
-            attendanceRecords: prev.attendanceRecords.map((record) =>
+          set((prev) => {
+            const nextRecords = prev.attendanceRecords.map((record) =>
               record.id === state.activeRecordId
                 ? {
                     ...record,
@@ -338,25 +391,31 @@ export const useAppStore = create<AppState>()(
                     isEdited: true,
                   }
                 : record
-            ),
-            notifications: [
-              {
-                id: Date.now().toString(),
-                title: "Attendance Updated",
-                message: `${cell.subjectCode} (${mergedTimeSlot || cell.timeSlot}) attendance was edited by ${state.user?.name}`,
-                createdAt: editedAt,
-                targetRole: "faculty",
-                read: false,
-              },
-              ...prev.notifications,
-            ],
-            students: cloneStudents(),
-            selectedCell: null,
-            activeRecordId: null,
-            isViewingSubmittedAttendance: false,
-            isEditMode: false,
-            currentPage: "dashboard",
-          }))
+            )
+
+            saveAttendanceRecordsToStorage(nextRecords)
+
+            return {
+              attendanceRecords: nextRecords,
+              notifications: [
+                {
+                  id: Date.now().toString(),
+                  title: "Attendance Updated",
+                  message: `${cell.subjectCode} (${mergedTimeSlot || cell.timeSlot}) attendance was edited by ${state.user?.name}`,
+                  createdAt: editedAt,
+                  targetRole: "faculty",
+                  read: false,
+                },
+                ...prev.notifications,
+              ],
+              students: cloneStudents(),
+              selectedCell: null,
+              activeRecordId: null,
+              isViewingSubmittedAttendance: false,
+              isEditMode: false,
+              currentPage: "dashboard",
+            }
+          })
 
           return
         }
@@ -374,18 +433,23 @@ export const useAppStore = create<AppState>()(
           submittedBy: `${state.user?.role.toUpperCase()} - ${state.user?.name}`,
         }
 
-        set((prev) => ({
-          attendanceRecords: [newRecord, ...prev.attendanceRecords],
-          timetable: prev.timetable.map((entry) =>
-            contiguousIds.includes(entry.id) ? { ...entry, status: "submitted" as const } : entry
-          ),
-          students: cloneStudents(),
-          selectedCell: null,
-          activeRecordId: null,
-          isViewingSubmittedAttendance: false,
-          isEditMode: false,
-          currentPage: "dashboard",
-        }))
+        set((prev) => {
+          const nextRecords = [newRecord, ...prev.attendanceRecords]
+          saveAttendanceRecordsToStorage(nextRecords)
+
+          return {
+            attendanceRecords: nextRecords,
+            timetable: prev.timetable.map((entry) =>
+              contiguousIds.includes(entry.id) ? { ...entry, status: "submitted" as const } : entry
+            ),
+            students: cloneStudents(),
+            selectedCell: null,
+            activeRecordId: null,
+            isViewingSubmittedAttendance: false,
+            isEditMode: false,
+            currentPage: "dashboard",
+          }
+        })
       },
 
       setSelectedCell: (cell) =>
@@ -439,7 +503,7 @@ export const useAppStore = create<AppState>()(
           }
 
           return {
-            timetable: generateTimetable(),
+            timetable: resetTimetableStatuses(state.timetable),
             students: cloneStudents(),
             selectedCell: null,
             activeRecordId: null,
@@ -544,6 +608,7 @@ export const useAppStore = create<AppState>()(
           if (!target) return {}
 
           const remainingRecords = state.attendanceRecords.filter((record) => record.id !== recordId)
+          saveAttendanceRecordsToStorage(remainingRecords)
           const removedCellIds = target.cellIds || []
           const usedCellIds = new Set(
             remainingRecords.flatMap((record) => record.cellIds || [])
@@ -578,19 +643,22 @@ export const useAppStore = create<AppState>()(
 
           const editedAt = new Date().toISOString()
           const editedBy = `${state.user?.role.toUpperCase()} - ${state.user?.name}`
+          const nextRecords = state.attendanceRecords.map((record) =>
+            record.id === recordId
+              ? {
+                  ...record,
+                  students: updatedStudents.map((student) => ({ ...student })),
+                  editedAt,
+                  editedBy,
+                  isEdited: true,
+                }
+              : record
+          )
+
+          saveAttendanceRecordsToStorage(nextRecords)
 
           return {
-            attendanceRecords: state.attendanceRecords.map((record) =>
-              record.id === recordId
-                ? {
-                    ...record,
-                    students: updatedStudents.map((student) => ({ ...student })),
-                    editedAt,
-                    editedBy,
-                    isEdited: true,
-                  }
-                : record
-            ),
+            attendanceRecords: nextRecords,
             notifications: [
               {
                 id: Date.now().toString(),
@@ -618,6 +686,80 @@ export const useAppStore = create<AppState>()(
             request.id === requestId ? { ...request, status: "rejected" as const } : request
           ),
         })),
+
+      addTimetableEntry: ({ day, timeSlot, subjectCode, facultyName }) =>
+        set((state) => {
+          const normalizedSubject = subjectCode.trim().toUpperCase()
+          const normalizedFaculty =
+            facultyName.trim() || subjectFacultyNames[normalizedSubject] || "Faculty Assigned"
+          if (!normalizedSubject) return {}
+
+          const existing = state.timetable.find((entry) => entry.day === day && entry.timeSlot === timeSlot)
+          if (existing) {
+            return {
+              timetable: state.timetable.map((entry) =>
+                entry.id === existing.id
+                  ? {
+                      ...entry,
+                      subjectCode: normalizedSubject,
+                      subjectName: subjectNames[normalizedSubject] ?? normalizedSubject,
+                      facultyName: normalizedFaculty,
+                      status: "upcoming" as const,
+                    }
+                  : entry
+              ),
+            }
+          }
+
+          const newEntry: TimetableCell = {
+            id: `custom-${Date.now()}`,
+            day,
+            timeSlot,
+            subjectCode: normalizedSubject,
+            subjectName: subjectNames[normalizedSubject] ?? normalizedSubject,
+            facultyName: normalizedFaculty,
+            status: "upcoming",
+          }
+
+          return {
+            timetable: [...state.timetable, newEntry],
+          }
+        }),
+
+      updateTimetableEntry: (id, { day, timeSlot, subjectCode, facultyName }) =>
+        set((state) => {
+          const normalizedSubject = subjectCode.trim().toUpperCase()
+          const normalizedFaculty =
+            facultyName.trim() || subjectFacultyNames[normalizedSubject] || "Faculty Assigned"
+          if (!normalizedSubject) return {}
+
+          return {
+            timetable: state.timetable.map((entry) =>
+              entry.id === id
+                ? {
+                    ...entry,
+                    day,
+                    timeSlot,
+                    subjectCode: normalizedSubject,
+                    subjectName: subjectNames[normalizedSubject] ?? normalizedSubject,
+                    facultyName: normalizedFaculty,
+                    status: "upcoming" as const,
+                  }
+                : entry
+            ),
+          }
+        }),
+
+      deleteTimetableEntry: (id) =>
+        set((state) => ({
+          timetable: state.timetable.filter((entry) => entry.id !== id),
+        })),
+
+      hydrateAttendanceRecords: () => {
+        const savedRecords = loadAttendanceRecordsFromStorage()
+        if (savedRecords.length === 0) return
+        set({ attendanceRecords: savedRecords })
+      },
     }),
     {
       name: "attendance-app-store-v1",

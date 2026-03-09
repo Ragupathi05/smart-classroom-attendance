@@ -7,6 +7,7 @@ import {
   FileEdit,
   BarChart3,
   Settings,
+  CalendarDays,
   LogOut,
   GraduationCap,
   X,
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Corrections", icon: FileEdit, page: "corrections" },
   { name: "Analytics", icon: BarChart3, page: "analytics" },
   { name: "Settings", icon: Settings, page: "settings" },
+  { name: "Timetable Editor", icon: CalendarDays, page: "timetable-editor" },
 ]
 
 interface SidebarProps {

@@ -255,7 +255,7 @@ export function TimetableGrid() {
                       className={cn(
                         "relative rounded-lg border px-2 py-3 text-left transition-all duration-200",
                         isMentorMentee ? "border-slate-300 bg-slate-100 text-slate-800" : stateStyles[cell.status],
-                        !isDisabled && "cursor-pointer hover:-translate-y-0.5 hover:shadow-md",
+                        !isDisabled && "cursor-pointer hover:-translate-y-1 hover:shadow-lg",
                         isDisabled && "cursor-not-allowed"
                       )}
                       title={
