@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import { useAppStore, type TimetableCell as TimetableCellType } from "@/lib/store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -51,8 +52,79 @@ type MergedCell = {
   span: number
 }
 
+const dayToIndex: Record<string, number> = {
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+}
+
+const slotStartToMinutes = (slot: string): number => {
+  const [time] = slot.split("-")
+  const [hour, minute] = time.split(":").map(Number)
+  return hour * 60 + minute
+}
+
+const slotEndToMinutes = (slot: string): number => {
+  const [, time] = slot.split("-")
+  const [hour, minute] = time.split(":").map(Number)
+  return hour * 60 + minute
+}
+
 export function TimetableGrid() {
-  const { timetable, setSelectedCell, setCurrentPage, user } = useAppStore()
+  const { timetable, attendanceRecords, setSelectedCell, setCurrentPage, user } = useAppStore()
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => setNow(new Date()), 30_000)
+    return () => window.clearInterval(timerId)
+  }, [])
+
+  const submittedCellIds = useMemo(() => {
+    return new Set(attendanceRecords.flatMap((record) => record.cellIds || []))
+  }, [attendanceRecords])
+
+  const nowDay = now.getDay()
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const todayName = days[nowDay - 1]
+
+  const getDisplayStatus = (cell: TimetableCellType): TimetableCellType["status"] => {
+    if (cell.status === "submitted" || submittedCellIds.has(cell.id)) {
+      return "submitted"
+    }
+
+    const cellDayIndex = dayToIndex[cell.day] ?? -1
+    if (cellDayIndex < nowDay) {
+      return "missed"
+    }
+    if (cellDayIndex > nowDay) {
+      return "upcoming"
+    }
+
+    const start = slotStartToMinutes(cell.timeSlot)
+    const end = slotEndToMinutes(cell.timeSlot)
+
+    if (nowMinutes >= start && nowMinutes < end) {
+      return "current"
+    }
+    if (nowMinutes >= end) {
+      return "missed"
+    }
+
+    return "upcoming"
+  }
+
+  const timetableWithStatus = useMemo(
+    () => timetable.map((cell) => ({ ...cell, status: getDisplayStatus(cell) })),
+    [timetable, nowDay, nowMinutes, submittedCellIds]
+  )
+
+  const hasCurrentClassToday = useMemo(() => {
+    if (!todayName) return false
+    return timetableWithStatus.some((cell) => cell.day === todayName && cell.status === "current")
+  }, [timetableWithStatus, todayName])
 
   const handleCellClick = (cell: TimetableCellType) => {
     if (user?.role === "faculty") return
@@ -63,7 +135,7 @@ export function TimetableGrid() {
   }
 
   const getCellForSlot = (day: string, timeSlot: string): TimetableCellType | null => {
-    return timetable.find((cell) => cell.day === day && cell.timeSlot === timeSlot) || null
+    return timetableWithStatus.find((cell) => cell.day === day && cell.timeSlot === timeSlot) || null
   }
 
   const getMergedCellsForDay = (day: string): MergedCell[] => {
@@ -78,7 +150,7 @@ export function TimetableGrid() {
       while (i + span < classSlots.length) {
         const nextSlot = classSlots[i + span]
         const nextCell = getCellForSlot(day, nextSlot)
-        if (!nextCell || nextCell.subjectCode !== current.subjectCode) break
+        if (!nextCell || nextCell.subjectCode !== current.subjectCode || nextCell.status !== current.status) break
         span += 1
       }
 
@@ -104,7 +176,7 @@ export function TimetableGrid() {
     }
   }
 
-  const todayIndex = new Date().getDay() - 1
+  const todayIndex = nowDay - 1
 
   return (
     <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
@@ -127,13 +199,18 @@ export function TimetableGrid() {
                   key={day}
                   style={{ gridColumn: index + 2, gridRow: 1 }}
                   className={cn(
-                    "flex items-center justify-center rounded-lg border px-2 py-3 text-sm font-semibold",
+                    "flex flex-col items-center justify-center rounded-lg border px-2 py-2 text-sm font-semibold",
                     todayIndex === index
                       ? "border-blue-400 bg-blue-600 text-white"
                       : "border-slate-200 bg-slate-100 text-slate-700"
                   )}
                 >
                   {day}
+                  {todayIndex === index && hasCurrentClassToday ? (
+                    <span className="mt-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                      Current now
+                    </span>
+                  ) : null}
                 </div>
               ))}
 
