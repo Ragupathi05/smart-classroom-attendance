@@ -126,16 +126,21 @@ export function Header({ onMenuClick }: HeaderProps) {
         {/* Profile */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="flex items-center gap-2 px-2 hover:bg-secondary">
-              <Avatar className="h-8 w-8 ring-2 ring-primary/20">
+            <Button
+              variant="ghost"
+              className="group flex h-10 items-center gap-2 rounded-xl border border-amber-200/80 bg-amber-50/70 px-2 transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-400 hover:bg-amber-100 hover:shadow-md hover:shadow-amber-200/60 data-[state=open]:border-amber-400 data-[state=open]:bg-amber-100"
+            >
+              <Avatar className="h-8 w-8 ring-2 ring-amber-300/80 transition-transform duration-200 group-hover:scale-105">
                 <AvatarFallback className="bg-primary text-sm font-bold text-primary-foreground">
                   {user?.name?.charAt(0).toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden text-left lg:block">
-                <p className="text-sm font-semibold">{user?.name}</p>
+                <p className="text-sm font-semibold transition-colors duration-200 group-hover:text-red-600 group-data-[state=open]:text-red-600">
+                  {user?.name}
+                </p>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {user?.role === "cr" ? "Class Rep" : user?.role === "lr" ? "Ladies Rep" : "Faculty"}
+                  {user?.role === "cr" ? "CR" : user?.role === "lr" ? "LR" : "FAC"}
                 </p>
               </div>
             </Button>

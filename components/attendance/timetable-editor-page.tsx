@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Plus, Pencil, Trash2, Hand } from "lucide-react"
 import { useAppStore } from "@/lib/store"
 import { toast } from "react-toastify"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,13 +28,17 @@ const TIME_SLOTS = [
 
 const dayOrder = new Map(DAYS.map((day, idx) => [day, idx]))
 const slotOrder = new Map(TIME_SLOTS.map((slot, idx) => [slot, idx]))
+const LONG_PRESS_MS = 500
 
 export function TimetableEditorPage() {
   const { timetable, addTimetableEntry, updateTimetableEntry, deleteTimetableEntry } = useAppStore()
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [actionEntryId, setActionEntryId] = useState<string | null>(null)
   const [slotErrorMessage, setSlotErrorMessage] = useState("")
+  const tableWrapperRef = useRef<HTMLDivElement | null>(null)
+  const longPressTimerRef = useRef<number | null>(null)
   const [form, setForm] = useState({
     day: DAYS[0],
     timeSlot: TIME_SLOTS[0],
@@ -50,6 +54,41 @@ export function TimetableEditorPage() {
     })
   }, [timetable])
 
+  useEffect(() => {
+    const handleOutsidePress = (event: MouseEvent | TouchEvent) => {
+      if (!tableWrapperRef.current) return
+      const target = event.target as Node | null
+      if (!target) return
+      if (!tableWrapperRef.current.contains(target)) {
+        setActionEntryId(null)
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsidePress)
+    document.addEventListener("touchstart", handleOutsidePress)
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsidePress)
+      document.removeEventListener("touchstart", handleOutsidePress)
+    }
+  }, [])
+
+  const startLongPress = (entryId: string) => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current)
+    }
+
+    longPressTimerRef.current = window.setTimeout(() => {
+      setActionEntryId(entryId)
+    }, LONG_PRESS_MS)
+  }
+
+  const clearLongPress = () => {
+    if (!longPressTimerRef.current) return
+    window.clearTimeout(longPressTimerRef.current)
+    longPressTimerRef.current = null
+  }
+
   const openAddModal = () => {
     setEditingId(null)
     setSlotErrorMessage("")
@@ -64,6 +103,7 @@ export function TimetableEditorPage() {
     subjectCode: string,
     facultyName: string
   ) => {
+    setActionEntryId(null)
     setEditingId(id)
     setSlotErrorMessage("")
     setForm({ day, timeSlot, subject: subjectCode, faculty: facultyName })
@@ -146,7 +186,11 @@ export function TimetableEditorPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="mb-3 flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <Hand className="h-3.5 w-3.5" />
+            <span>Long press a row to show Edit and Delete</span>
+          </div>
+          <div ref={tableWrapperRef} className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">
@@ -154,49 +198,66 @@ export function TimetableEditorPage() {
                   <th className="px-3 py-2 font-medium">Time Slot</th>
                   <th className="px-3 py-2 font-medium">Subject</th>
                   <th className="px-3 py-2 font-medium">Faculty</th>
-                  <th className="px-3 py-2 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedTimetable.map((entry) => (
-                  <tr key={entry.id} className="border-b border-border/60 transition-colors hover:bg-muted/40">
+                {sortedTimetable.map((entry) => {
+                  const showActions = actionEntryId === entry.id
+
+                  return (
+                  <tr
+                    key={entry.id}
+                    onMouseDown={() => startLongPress(entry.id)}
+                    onMouseUp={clearLongPress}
+                    onMouseLeave={clearLongPress}
+                    onTouchStart={() => startLongPress(entry.id)}
+                    onTouchEnd={clearLongPress}
+                    className="cursor-pointer border-b border-border/60 transition-colors hover:bg-muted/40"
+                  >
                     <td className="px-3 py-2 text-foreground">{entry.day}</td>
                     <td className="px-3 py-2 text-foreground">{entry.timeSlot}</td>
                     <td className="px-3 py-2 font-medium text-foreground">{entry.subjectCode}</td>
-                    <td className="px-3 py-2 text-foreground">{entry.facultyName}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            openEditModal(
-                              entry.id,
-                              entry.day,
-                              entry.timeSlot,
-                              entry.subjectCode,
-                              entry.facultyName
-                            )
-                          }
-                        >
-                          <Pencil className="mr-1 h-3.5 w-3.5" />
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-destructive hover:bg-destructive/10"
-                          onClick={() =>
-                            handleDeleteEntry(entry.id, entry.day, entry.timeSlot, entry.subjectCode)
-                          }
-                        >
-                          <Trash2 className="mr-1 h-3.5 w-3.5" />
-                          Delete
-                        </Button>
+                    <td className="px-3 py-2 text-foreground">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>{entry.facultyName}</span>
+                        {showActions ? (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                openEditModal(
+                                  entry.id,
+                                  entry.day,
+                                  entry.timeSlot,
+                                  entry.subjectCode,
+                                  entry.facultyName
+                                )
+                              }}
+                            >
+                              <Pencil className="mr-1 h-3.5 w-3.5" />
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-destructive hover:bg-destructive/10"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleDeleteEntry(entry.id, entry.day, entry.timeSlot, entry.subjectCode)
+                              }}
+                            >
+                              <Trash2 className="mr-1 h-3.5 w-3.5" />
+                              Delete
+                            </Button>
+                          </div>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

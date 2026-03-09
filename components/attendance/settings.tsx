@@ -16,19 +16,60 @@ export function Settings() {
   const { user, setCurrentPage, appSettings, updateAppSettings, updateUserProfile } = useAppStore()
   const [name, setName] = useState(user?.name || "")
   const [email, setEmail] = useState(user?.email || "")
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [isProfileConfirmed, setIsProfileConfirmed] = useState(false)
+
+  const isProfileDirty =
+    name.trim() !== (user?.name || "").trim() ||
+    email.trim().toLowerCase() !== (user?.email || "").trim().toLowerCase()
 
   useEffect(() => {
     setName(user?.name || "")
     setEmail(user?.email || "")
+    setIsEditingProfile(false)
+    setIsProfileConfirmed(false)
   }, [user?.name, user?.email])
 
+  const handleStartProfileEdit = () => {
+    setIsEditingProfile(true)
+    setIsProfileConfirmed(false)
+  }
+
+  const handleCancelProfileEdit = () => {
+    setName(user?.name || "")
+    setEmail(user?.email || "")
+    setIsEditingProfile(false)
+    setIsProfileConfirmed(false)
+  }
+
+  const handleConfirmProfile = () => {
+    if (!isProfileDirty) {
+      toast.info("No changes to confirm")
+      return
+    }
+
+    const shouldConfirm = window.confirm("Confirm profile changes?")
+    if (!shouldConfirm) return
+
+    setIsProfileConfirmed(true)
+    toast.success("Changes confirmed. Click Save to apply.")
+  }
+
   const handleSaveProfile = () => {
+    if (!isEditingProfile) return
+    if (!isProfileConfirmed) {
+      toast.warning("Please confirm changes before saving")
+      return
+    }
+
     const result = updateUserProfile({ name, email })
     if (!result.success) {
       toast.error(result.message)
       return
     }
     toast.success(result.message)
+    setIsEditingProfile(false)
+    setIsProfileConfirmed(false)
   }
 
   const handleToggle = (key: keyof typeof appSettings, value: boolean) => {
@@ -51,7 +92,7 @@ export function Settings() {
             Profile Settings
           </CardTitle>
           <CardDescription className="text-muted-foreground">
-            Update your personal information
+            Click Edit Profile to unlock fields, then Confirm and Save
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -61,8 +102,11 @@ export function Settings() {
                 {user?.name?.charAt(0) || "U"}
               </AvatarFallback>
             </Avatar>
-            <div>
+            <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => toast.info("Avatar upload will be enabled soon")}>Change Avatar</Button>
+              {!isEditingProfile ? (
+                <Button size="sm" onClick={handleStartProfileEdit}>Edit Profile</Button>
+              ) : null}
             </div>
           </div>
           
@@ -71,7 +115,16 @@ export function Settings() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name" className="text-foreground">Full Name</Label>
-              <Input id="name" value={name} onChange={(event) => setName(event.target.value)} className="bg-input" />
+              <Input
+                id="name"
+                value={name}
+                onChange={(event) => {
+                  setIsProfileConfirmed(false)
+                  setName(event.target.value)
+                }}
+                disabled={!isEditingProfile}
+                className={isEditingProfile ? "bg-input" : "bg-muted"}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email" className="text-foreground">Email</Label>
@@ -79,8 +132,12 @@ export function Settings() {
                 id="email"
                 type="email"
                 value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="bg-input"
+                onChange={(event) => {
+                  setIsProfileConfirmed(false)
+                  setEmail(event.target.value)
+                }}
+                disabled={!isEditingProfile}
+                className={isEditingProfile ? "bg-input" : "bg-muted"}
               />
             </div>
             <div className="space-y-2">
@@ -104,7 +161,17 @@ export function Settings() {
             </div>
           </div>
           
-          <Button onClick={handleSaveProfile}>Save Changes</Button>
+          {isEditingProfile ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" onClick={handleCancelProfileEdit}>Cancel</Button>
+              <Button variant="secondary" onClick={handleConfirmProfile}>
+                Confirm
+              </Button>
+              <Button onClick={handleSaveProfile} disabled={!isProfileConfirmed || !isProfileDirty}>
+                Save
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

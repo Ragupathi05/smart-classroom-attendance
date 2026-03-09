@@ -403,9 +403,7 @@ Last Modified: ${formatDateTime(record.editedAt || record.submittedAt)}
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">AttendanceHistoryPage</h1>
-        <p className="text-muted-foreground">
-          Previously recorded attendance entries. Long press a row to reveal remove option.
-        </p>
+        <p className="text-muted-foreground">Previously recorded attendance entries.</p>
       </div>
 
       <div className="relative w-full max-w-sm">
@@ -482,9 +480,7 @@ Last Modified: ${formatDateTime(record.editedAt || record.submittedAt)}
                             <Trash2 className="mr-1 h-4 w-4" />
                             Remove
                           </Button>
-                        ) : (
-                          <span className="hidden text-xs text-muted-foreground sm:inline">Hold to remove</span>
-                        )}
+                        ) : null}
                       </div>
                     </TableCell>
                   </TableRow>

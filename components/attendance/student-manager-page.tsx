@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react"
-import { Upload, UserRoundPlus, Pencil, Trash2 } from "lucide-react"
+import { Upload, UserRoundPlus, Pencil, Trash2, Hand } from "lucide-react"
 import { toast } from "react-toastify"
 import { useAppStore } from "@/lib/store"
 import { Button } from "@/components/ui/button"
@@ -191,9 +191,7 @@ export function StudentManagerPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <CardTitle className="text-lg font-semibold text-foreground">Students</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Tap a row to select. Long press a row to edit quickly.
-              </CardDescription>
+              <CardDescription className="text-muted-foreground">Manage class student details and imports</CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -220,6 +218,10 @@ export function StudentManagerPage() {
         </CardHeader>
 
         <CardContent>
+          <div className="mb-3 flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <Hand className="h-3.5 w-3.5" />
+            <span>Long press a row to show Edit and Delete</span>
+          </div>
           <div ref={tableWrapperRef} className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-sm">
               <thead>
@@ -276,9 +278,7 @@ export function StudentManagerPage() {
                                 Delete
                               </Button>
                             </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Long press for actions</span>
-                          )}
+                          ) : null}
                         </div>
                       </td>
                     </tr>
