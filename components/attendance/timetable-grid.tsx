@@ -33,10 +33,10 @@ const displayTime = (slot: string) => slot.replace(/-/g, "–")
 
 const stateStyles: Record<TimetableCellType["status"], string> = {
   current:
-    "border-blue-500 bg-blue-50 text-blue-900 shadow-[0_0_0_1px_rgba(59,130,246,0.5),0_0_18px_rgba(59,130,246,0.45)] animate-pulse",
-  submitted: "border-green-300 bg-green-100 text-green-900",
-  missed: "border-yellow-300 bg-yellow-100 text-yellow-900",
-  upcoming: "border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50",
+    "border-cyan-500 bg-cyan-50 text-cyan-900 shadow-[0_0_0_1px_rgba(6,182,212,0.55),0_0_18px_rgba(6,182,212,0.45)] animate-pulse",
+  submitted: "border-teal-300 bg-teal-100 text-teal-900",
+  missed: "border-orange-300 bg-orange-100 text-orange-900",
+  upcoming: "border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50",
 }
 
 const stateLabel: Record<TimetableCellType["status"], string> = {
@@ -201,7 +201,7 @@ export function TimetableGrid() {
                   className={cn(
                     "flex flex-col items-center justify-center rounded-lg border px-2 py-2 text-sm font-semibold",
                     todayIndex === index
-                      ? "border-blue-400 bg-blue-600 text-white"
+                      ? "border-cyan-400 bg-cyan-600 text-white"
                       : "border-slate-200 bg-slate-100 text-slate-700"
                   )}
                 >
@@ -300,10 +300,10 @@ export function TimetableGrid() {
 
         <div className="mt-6 flex flex-wrap gap-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
           <span className="font-semibold">Legend:</span>
-          <span>Current class: glowing border + pulse</span>
-          <span>Attendance completed: green + ✓</span>
-          <span>Attendance missing: yellow + ⚠</span>
-          <span>Upcoming class: normal card</span>
+          <span>Current class: cyan glow + pulse</span>
+          <span>Attendance completed: teal + ✓</span>
+          <span>Attendance missing: orange + ⚠</span>
+          <span>Upcoming class: slate neutral card</span>
           <span>Continuous same subject: merged as one block</span>
         </div>
       </CardContent>
