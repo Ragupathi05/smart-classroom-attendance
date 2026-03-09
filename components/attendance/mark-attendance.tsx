@@ -31,6 +31,7 @@ export function MarkAttendance() {
 
   const classFacultyName = "Mr. P. Udayakumar"
   const activeRecord = attendanceRecords.find((record) => record.id === activeRecordId)
+  const getActorLabel = (value?: string) => value?.split(" - ")[0] || "N/A"
 
   const handleSaveDraft = () => {
     setIsSaving(true)
@@ -142,20 +143,16 @@ export function MarkAttendance() {
       {isViewingSubmittedAttendance && !isEditMode && (
         <Card className="border-border bg-card">
           <CardContent className="py-4">
-            <p className="text-sm font-medium text-foreground">
-              Attendance already submitted for this class.
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Submitted by {activeRecord?.submittedBy || "N/A"}
-              {activeRecord?.submittedAt
+            <p className="text-sm text-muted-foreground">
+              Last modified by {getActorLabel(activeRecord?.isEdited ? activeRecord?.editedBy : activeRecord?.submittedBy)}
+              {activeRecord?.isEdited
+                ? activeRecord?.editedAt
+                  ? ` on ${new Date(activeRecord.editedAt).toLocaleString()}`
+                  : ""
+                : activeRecord?.submittedAt
                 ? ` on ${new Date(activeRecord.submittedAt).toLocaleString()}`
                 : ""}
             </p>
-            {activeRecord?.isEdited && activeRecord.editedAt && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Last edited by {activeRecord.editedBy} on {new Date(activeRecord.editedAt).toLocaleString()}
-              </p>
-            )}
           </CardContent>
         </Card>
       )}

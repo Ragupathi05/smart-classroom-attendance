@@ -50,11 +50,21 @@ const getShortWeekday = (dateStr: string) => {
 const toPercent = (attended: number, total: number) =>
   total > 0 ? Math.round((attended / total) * 100) : 0
 
+const getISOWeekKey = (date: Date): string => {
+  const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const day = utcDate.getUTCDay() || 7
+  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day)
+  const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1))
+  const weekNo = Math.ceil((((utcDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+  return `${utcDate.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`
+}
+
 export function Analytics() {
   const { attendanceRecords, students } = useAppStore()
 
   const {
     overallStats,
+    attendanceTrend,
     weeklyTrendData,
     subjectData,
     lowAttendanceStudents,
@@ -71,6 +81,7 @@ export function Analytics() {
       string,
       { subject: string; fullName: string; attended: number; total: number; classes: number }
     >()
+    const weekAttendanceBuckets = new Map<string, { attended: number; total: number }>()
 
     let overallAttended = 0
     let overallTotal = 0
@@ -81,6 +92,16 @@ export function Analytics() {
 
       overallAttended += attended
       overallTotal += total
+
+      const recordDate = new Date(`${record.date}T00:00:00`)
+      const weekKey = getISOWeekKey(recordDate)
+      const weekBucket = weekAttendanceBuckets.get(weekKey)
+      if (weekBucket) {
+        weekBucket.attended += attended
+        weekBucket.total += total
+      } else {
+        weekAttendanceBuckets.set(weekKey, { attended, total })
+      }
 
       const weekday = getShortWeekday(record.date)
       if (weeklyBuckets[weekday]) {
@@ -183,8 +204,41 @@ export function Analytics() {
       lowestAttendance: lowestSubject ?? { subject: "N/A", value: 0 },
     }
 
+    const now = new Date()
+    const previousWeekDate = new Date(now)
+    previousWeekDate.setDate(now.getDate() - 7)
+
+    const currentWeekKey = getISOWeekKey(now)
+    const previousWeekKey = getISOWeekKey(previousWeekDate)
+
+    const currentWeekBucket = weekAttendanceBuckets.get(currentWeekKey)
+    const previousWeekBucket = weekAttendanceBuckets.get(previousWeekKey)
+
+    const currentWeekAverage = currentWeekBucket
+      ? toPercent(currentWeekBucket.attended, currentWeekBucket.total)
+      : computedOverallStats.averageAttendance
+    const previousWeekAverage = previousWeekBucket
+      ? toPercent(previousWeekBucket.attended, previousWeekBucket.total)
+      : currentWeekAverage
+
+    const trend =
+      currentWeekAverage > previousWeekAverage
+        ? "up"
+        : currentWeekAverage < previousWeekAverage
+        ? "down"
+        : "same"
+
+    const computedAttendanceTrend = {
+      currentWeekAverage,
+      previousWeekAverage,
+      trend,
+      trendLabel: trend === "up" ? "↑ Improving" : trend === "down" ? "↓ Dropping" : "→ Stable",
+      trendColor: trend === "up" ? "text-green-600" : trend === "down" ? "text-red-600" : "text-gray-500",
+    }
+
     return {
       overallStats: computedOverallStats,
+      attendanceTrend: computedAttendanceTrend,
       weeklyTrendData: computedWeeklyTrendData,
       subjectData: computedSubjectData,
       lowAttendanceStudents: computedLowAttendanceStudents,
@@ -203,7 +257,9 @@ export function Analytics() {
         {[
           {
             title: "Average Attendance",
-            value: `${overallStats.averageAttendance}%`,
+            value: `${attendanceTrend.currentWeekAverage}%`,
+            trendLabel: attendanceTrend.trendLabel,
+            trendColor: attendanceTrend.trendColor,
             icon: TrendingUp,
             color: "text-primary",
             bgColor: "bg-primary/10",
@@ -241,7 +297,12 @@ export function Analytics() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">{stat.title}</p>
-                  <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                    {stat.trendLabel ? (
+                      <span className={`text-sm font-medium ${stat.trendColor}`}>{stat.trendLabel}</span>
+                    ) : null}
+                  </div>
                   {stat.subtitle && (
                     <p className="text-xs text-muted-foreground">{stat.subtitle}</p>
                   )}
