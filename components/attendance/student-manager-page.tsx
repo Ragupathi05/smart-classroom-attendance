@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react"
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
 import { Upload, UserRoundPlus, Pencil, Trash2, Hand } from "lucide-react"
 import { toast } from "react-toastify"
 import { useAppStore } from "@/lib/store"
@@ -21,6 +21,7 @@ const LONG_PRESS_MS = 500
 export function StudentManagerPage() {
   const {
     classStudents,
+    attendanceRecords,
     addClassStudent,
     updateClassStudent,
     deleteClassStudent,
@@ -179,6 +180,23 @@ export function StudentManagerPage() {
     longPressTimer.current = null
   }
 
+  const attendanceStatsByStudent = useMemo(() => {
+    const stats = new Map<string, { total: number; attended: number }>()
+
+    for (const record of attendanceRecords) {
+      for (const student of record.students) {
+        const current = stats.get(student.id) || { total: 0, attended: 0 }
+        current.total += 1
+        if (student.status !== "absent") {
+          current.attended += 1
+        }
+        stats.set(student.id, current)
+      }
+    }
+
+    return stats
+  }, [attendanceRecords])
+
   return (
     <div className="space-y-6">
       <div>
@@ -228,11 +246,25 @@ export function StudentManagerPage() {
                 <tr className="border-b border-border bg-muted/40 text-left text-muted-foreground">
                   <th className="px-3 py-2 font-medium">Roll Number</th>
                   <th className="px-3 py-2 font-medium">Student Name</th>
+                  <th className="px-3 py-2 text-center font-medium">Conducted</th>
+                  <th className="px-3 py-2 text-center font-medium">Attended</th>
+                  <th className="px-3 py-2 text-center font-medium">Attendance %</th>
                 </tr>
               </thead>
               <tbody>
                 {classStudents.map((student) => {
                   const showActions = actionStudentId === student.id
+                  const stats = attendanceStatsByStudent.get(student.id) || { total: 0, attended: 0 }
+                  const attendancePercent = stats.total > 0
+                    ? Math.round((stats.attended / stats.total) * 100)
+                    : 0
+                  const percentageColorClass =
+                    attendancePercent >= 85
+                      ? "text-green-600"
+                      : attendancePercent >= 75
+                      ? "text-amber-600"
+                      : "text-red-600"
+
                   return (
                     <tr
                       key={student.id}
@@ -280,6 +312,11 @@ export function StudentManagerPage() {
                             </div>
                           ) : null}
                         </div>
+                      </td>
+                      <td className="px-3 py-2 text-center font-medium text-foreground">{stats.total}</td>
+                      <td className="px-3 py-2 text-center font-medium text-foreground">{stats.attended}</td>
+                      <td className={cn("px-3 py-2 text-center font-semibold", percentageColorClass)}>
+                        {attendancePercent}%
                       </td>
                     </tr>
                   )

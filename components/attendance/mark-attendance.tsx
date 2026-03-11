@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, Save, Send, PencilLine } from "lucide-react"
+import { ArrowLeft, Save, Send, PencilLine, Copy } from "lucide-react"
 import { useAppStore } from "@/lib/store"
 import { AttendanceSummary } from "./attendance-summary"
 import { AttendanceBar } from "./attendance-bar"
@@ -16,6 +16,7 @@ export function MarkAttendance() {
     selectedCell,
     setCurrentPage,
     submitAttendance,
+    copyPreviousPeriodAttendance,
     user,
     isViewingSubmittedAttendance,
     isEditMode,
@@ -69,10 +70,25 @@ export function MarkAttendance() {
         absentStudents,
       }
 
-      submitAttendance(selectedCell)
+      const result = submitAttendance(selectedCell)
 
-      if (isViewingSubmittedAttendance && isEditMode) {
-        toast.success("Attendance updated successfully")
+      if (!result.success) {
+        toast.error(result.message)
+        return
+      }
+
+      if (result.mode === "updated") {
+        toast.success(result.message)
+        return
+      }
+
+      if (result.mode === "request-created") {
+        toast.success(result.message)
+        return
+      }
+
+      if (result.mode === "no-change") {
+        toast.info(result.message)
         return
       }
 
@@ -82,6 +98,18 @@ export function MarkAttendance() {
     } catch {
       toast.error("Failed to submit attendance")
     }
+  }
+
+  const handleUsePreviousHour = () => {
+    if (!selectedCell) return
+
+    const result = copyPreviousPeriodAttendance(selectedCell)
+    if (!result.success) {
+      toast.error(result.message)
+      return
+    }
+
+    toast.success(result.message)
   }
 
   const handleCloseModal = () => {
@@ -194,6 +222,16 @@ export function MarkAttendance() {
             Edit Attendance
           </Button>
         ) : null}
+
+        <Button
+          variant="secondary"
+          onClick={handleUsePreviousHour}
+          disabled={isViewingSubmittedAttendance && !isEditMode}
+          className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.98]"
+        >
+          <Copy className="mr-2 h-4 w-4" />
+          Use Previous Hour
+        </Button>
 
         <Button
           variant="outline"

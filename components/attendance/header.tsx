@@ -72,7 +72,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             <Calendar className="hidden h-3.5 w-3.5 sm:block" />
             <span>{mounted && time ? formatDate(time) : "Loading..."}</span>
           </div>
-          <p className="truncate text-sm font-semibold text-foreground sm:text-base">{user?.class} - {user?.department}</p>
+          <p className="truncate text-sm font-semibold text-foreground sm:text-base">{user?.className || "Class not set"}</p>
         </div>
       </div>
 
@@ -136,7 +136,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                 </AvatarFallback>
               </Avatar>
               <div className="hidden text-left lg:block">
-                <p className="text-sm font-semibold transition-colors duration-200 group-hover:text-red-600 group-data-[state=open]:text-red-600">
+                <p className="text-sm font-semibold text-foreground transition-colors duration-200 group-hover:text-foreground group-data-[state=open]:text-foreground">
                   {user?.name}
                 </p>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -148,7 +148,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setCurrentPage("settings")}>
+            <DropdownMenuItem onClick={() => setCurrentPage("profile")}>
               <User className="mr-2 h-4 w-4" />
               Profile
             </DropdownMenuItem>

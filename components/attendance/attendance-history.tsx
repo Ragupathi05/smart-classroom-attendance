@@ -45,12 +45,12 @@ function isWithinAllowedWindow(record: AttendanceRecord) {
 }
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
+  const date = new Date(dateStr)
+  const dayOfMonth = String(date.getDate()).padStart(2, "0")
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const year = date.getFullYear()
+
+  return `${dayOfMonth}-${month}-${year}`
 }
 
 function formatDateTime(dateStr?: string) {
@@ -64,6 +64,37 @@ function formatDateTime(dateStr?: string) {
   })
 }
 
+function formatTime12h(time: string) {
+  const [hourStr, minuteStr] = time.split(":")
+  const hour = Number(hourStr)
+  const minute = Number(minuteStr)
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return time
+
+  const suffix = hour >= 12 ? "PM" : "AM"
+  const hour12 = hour % 12 || 12
+  return `${hour12}:${String(minute).padStart(2, "0")}${suffix}`
+}
+
+function formatTimeSlotLabel(slot: string) {
+  const [start, end] = slot.split("-")
+  if (!start || !end) return slot
+  return `${formatTime12h(start)} - ${formatTime12h(end)}`
+}
+
+function formatShortRoll(rollNumber: string) {
+  const regularMatch = /^23691A33(\d{2})$/i.exec(rollNumber)
+  if (regularMatch) {
+    return regularMatch[1]
+  }
+
+  const lateralMatch = /^24695A33(\d{2})$/i.exec(rollNumber)
+  if (lateralMatch) {
+    return `LE${Number(lateralMatch[1])}`
+  }
+
+  return rollNumber
+}
+
 export function AttendanceHistoryPage() {
   const {
     attendanceRecords,
@@ -73,6 +104,7 @@ export function AttendanceHistoryPage() {
   } = useAppStore()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
+  const [selectedDate, setSelectedDate] = useState("")
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null)
   const [draftStudents, setDraftStudents] = useState<Student[]>([])
   const [isEditMode, setIsEditMode] = useState(false)
@@ -80,16 +112,21 @@ export function AttendanceHistoryPage() {
   const longPressTimerRef = useRef<number | null>(null)
   const longPressTriggeredRef = useRef(false)
 
-  const filteredRecords = useMemo(
-    () =>
-      attendanceRecords.filter(
-        (record) =>
-          record.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.subjectCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.date.includes(searchTerm)
-      ),
-    [attendanceRecords, searchTerm]
-  )
+  const filteredRecords = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+
+    return attendanceRecords.filter((record) => {
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        record.subject.toLowerCase().includes(normalizedSearch) ||
+        record.subjectCode.toLowerCase().includes(normalizedSearch) ||
+        record.date.includes(normalizedSearch)
+
+      const matchesDate = selectedDate.length === 0 || record.date === selectedDate
+
+      return matchesSearch && matchesDate
+    })
+  }, [attendanceRecords, searchTerm, selectedDate])
 
   const openDetail = (record: AttendanceRecord) => {
     setSelectedRecord(record)
@@ -119,27 +156,21 @@ export function AttendanceHistoryPage() {
   const buildShareReport = (record: AttendanceRecord, students: Student[]) => {
     const counts = getCounts(students)
     const absentStudents = students.filter((student) => student.status === "absent")
+    const permissionStudents = students.filter((student) => student.status === "permission")
 
-    return `ATTENDANCE REPORT
-================
-Subject: ${record.subject} (${record.subjectCode})
-Date: ${formatDate(record.date)}
-Time: ${record.timeSlot}
-Class: ${record.className}
+    const absentRolls = absentStudents.map((student) => formatShortRoll(student.rollNumber)).join(", ") || "-"
+    const permissionRolls =
+      permissionStudents.map((student) => formatShortRoll(student.rollNumber)).join(", ") || "-"
 
-SUMMARY
--------
+    return `${formatDate(record.date)}
+${record.subjectCode} - (${formatTimeSlotLabel(record.timeSlot)})
+
+Absentees: ${absentRolls}
+Permissions: ${permissionRolls}
+
 Present: ${counts.present}
 Permission: ${counts.permission}
-Absent: ${counts.absent}
-Total: ${students.length}
-
-${absentStudents.length > 0 ? `ABSENT STUDENTS\n---------------\n${absentStudents
-      .map((student) => `${student.rollNumber} - ${student.name}`)
-      .join("\n")}` : "All students present!"}
-
-Last Modified: ${formatDateTime(record.editedAt || record.submittedAt)}
-`
+Absent: ${counts.absent}`
   }
 
   const handleShareAttendance = async () => {
@@ -402,18 +433,37 @@ Last Modified: ${formatDateTime(record.editedAt || record.submittedAt)}
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">AttendanceHistoryPage</h1>
+        <h1 className="text-2xl font-bold text-foreground">Attendance History</h1>
         <p className="text-muted-foreground">Previously recorded attendance entries.</p>
       </div>
 
-      <div className="relative w-full max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative w-full sm:max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by subject, code, or date"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            className="bg-input pl-9"
+          />
+        </div>
         <Input
-          placeholder="Search by subject code, subject or date"
-          value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
-          className="bg-input pl-9"
+          type="date"
+          value={selectedDate}
+          onChange={(event) => setSelectedDate(event.target.value)}
+          className="w-full sm:w-[220px]"
         />
+        {(searchTerm || selectedDate) && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSearchTerm("")
+              setSelectedDate("")
+            }}
+          >
+            Clear Filters
+          </Button>
+        )}
       </div>
 
       <Card className="border-border bg-card">
@@ -422,7 +472,7 @@ Last Modified: ${formatDateTime(record.editedAt || record.submittedAt)}
             <CardTitle className="text-lg font-semibold text-foreground">Attendance Records ({filteredRecords.length})</CardTitle>
             <div className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
               <Hand className="h-3.5 w-3.5" />
-              <span>Long press row to remove</span>
+              <span>Long press a row to remove</span>
             </div>
           </div>
         </CardHeader>
@@ -432,6 +482,7 @@ Last Modified: ${formatDateTime(record.editedAt || record.submittedAt)}
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead>Date</TableHead>
                 <TableHead>Subject</TableHead>
+                <TableHead>Period/Time</TableHead>
                 <TableHead className="text-center">Present</TableHead>
                 <TableHead className="text-center">Permission</TableHead>
                 <TableHead className="text-center">Absent</TableHead>
@@ -460,6 +511,7 @@ Last Modified: ${formatDateTime(record.editedAt || record.submittedAt)}
                         <span className="text-foreground">{record.subject}</span>
                       </div>
                     </TableCell>
+                    <TableCell className="text-sm text-foreground">{record.timeSlot}</TableCell>
                     <TableCell className="text-center text-green-600">{counts.present}</TableCell>
                     <TableCell className="text-center text-yellow-600">{counts.permission}</TableCell>
                     <TableCell className="text-center text-red-600">{counts.absent}</TableCell>

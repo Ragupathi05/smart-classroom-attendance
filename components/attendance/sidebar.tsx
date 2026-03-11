@@ -20,12 +20,12 @@ import { Button } from "@/components/ui/button"
 const navigation = [
   { name: "Dashboard", icon: LayoutDashboard, page: "dashboard" },
   { name: "Mark Attendance", icon: ClipboardCheck, page: "mark-attendance" },
-  { name: "History", icon: History, page: "history" },
   { name: "Corrections", icon: FileEdit, page: "corrections" },
   { name: "Analytics", icon: BarChart3, page: "analytics" },
-  { name: "Settings", icon: Settings, page: "settings" },
-  { name: "Timetable Editor", icon: CalendarDays, page: "timetable-editor" },
+  { name: "History", icon: History, page: "history" },
   { name: "Student Manager", icon: Users, page: "student-manager" },
+  { name: "Timetable Editor", icon: CalendarDays, page: "timetable-editor" },
+  { name: "Settings", icon: Settings, page: "settings" },
 ]
 
 interface SidebarProps {
@@ -125,16 +125,19 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         {/* User Info & Logout */}
         <div className="border-t border-border/50 p-3">
           <div className="mb-3 rounded-xl bg-gradient-to-br from-sidebar-accent to-sidebar-accent/50 p-3">
-            <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <span className="text-sm font-bold">
-                {user?.name?.charAt(0).toUpperCase() || "U"}
-              </span>
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <span className="text-sm font-bold">
+                  {user?.name?.charAt(0).toUpperCase() || "U"}
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-sidebar-foreground">{user?.name}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {user?.role === "cr" ? "Class Representative" : user?.role === "lr" ? "Ladies Representative" : "Faculty"}
+                </p>
+              </div>
             </div>
-            <p className="truncate text-sm font-semibold text-sidebar-foreground">{user?.name}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {user?.role === "cr" ? "Class Representative" : user?.role === "lr" ? "Ladies Representative" : "Faculty"}
-            </p>
-            <p className="mt-1 text-[10px] text-muted-foreground">{user?.class} | {user?.department}</p>
           </div>
           <Button
             variant="ghost"

@@ -11,6 +11,7 @@ import { AttendanceHistory } from "./attendance-history"
 import { CorrectionRequests } from "./correction-requests"
 import { Analytics } from "./analytics"
 import { Settings } from "./settings"
+import { ProfilePage } from "./profile-page"
 import { TimetableEditorPage } from "./timetable-editor-page"
 import { StudentManagerPage } from "./student-manager-page"
 import { Toaster } from "@/components/ui/toaster"
@@ -68,6 +69,8 @@ export function AttendanceApp() {
         return <Analytics />
       case "settings":
         return <Settings />
+      case "profile":
+        return <ProfilePage />
       case "timetable-editor":
         return <TimetableEditorPage />
       case "student-manager":

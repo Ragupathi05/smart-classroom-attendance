@@ -56,15 +56,28 @@ export interface AppNotification {
   read: boolean
 }
 
+export interface CorrectionChange {
+  studentId: string
+  rollNumber: string
+  studentName: string
+  fromStatus: AttendanceStatus
+  toStatus: AttendanceStatus
+}
+
 export interface CorrectionRequest {
   id: string
   recordId?: string
   studentId?: string
-  studentName: string
-  rollNumber: string
+  studentName?: string
+  rollNumber?: string
   subject: string
+  subjectCode?: string
   date: string
+  timeSlot?: string
+  className?: string
+  facultyName?: string
   reason: string
+  changes?: CorrectionChange[]
   requestedAt?: string
   requestedBy?: string
   status: "pending" | "approved" | "rejected"
@@ -101,7 +114,12 @@ interface AppState {
   logout: () => void
   setCurrentPage: (page: string) => void
   updateStudentStatus: (studentId: string, status: AttendanceStatus) => void
-  submitAttendance: (cell: TimetableCell) => void
+  copyPreviousPeriodAttendance: (cell: TimetableCell) => { success: boolean; message: string }
+  submitAttendance: (cell: TimetableCell) => {
+    success: boolean
+    mode: "submitted" | "updated" | "request-created" | "no-change"
+    message: string
+  }
   setSelectedCell: (cell: TimetableCell | null) => void
   startEditingSubmittedAttendance: () => void
   ensureWeeklyTimetableReset: () => void
@@ -116,6 +134,7 @@ interface AppState {
   updateAttendanceRecordFromHistory: (recordId: string, updatedStudents: Student[]) => void
   approveCorrectionRequest: (requestId: string) => void
   rejectCorrectionRequest: (requestId: string) => void
+  deleteCorrectionRequest: (requestId: string) => void
   hydrateAttendanceRecords: () => void
   addTimetableEntry: (entry: { day: string; timeSlot: string; subjectCode: string; facultyName: string }) => void
   updateTimetableEntry: (id: string, entry: { day: string; timeSlot: string; subjectCode: string; facultyName: string }) => void
@@ -411,12 +430,168 @@ export const useAppStore = create<AppState>()(
           ),
         })),
 
+      copyPreviousPeriodAttendance: (cell) => {
+        const state = get()
+        const currentSlotIndex = slotIndexMap.get(cell.timeSlot)
+
+        if (currentSlotIndex === undefined) {
+          return { success: false, message: "Current period slot could not be identified." }
+        }
+
+        if (currentSlotIndex === 0) {
+          return { success: false, message: "No previous period available for the first hour." }
+        }
+
+        const today = new Date().toISOString().split("T")[0]
+        let sourceRecord: AttendanceRecord | undefined
+        let sourceSlot = ""
+
+        for (let offset = 1; offset <= 2; offset += 1) {
+          const candidateIndex = currentSlotIndex - offset
+          if (candidateIndex < 0) break
+
+          const candidateSlot = timeSlots[candidateIndex]
+          const candidateCell = state.timetable.find(
+            (entry) => entry.day === cell.day && entry.timeSlot === candidateSlot
+          )
+
+          if (!candidateCell) continue
+
+          const found = state.attendanceRecords.find(
+            (record) =>
+              record.date === today &&
+              (record.cellIds?.includes(candidateCell.id) || record.timeSlot === candidateSlot)
+          )
+
+          if (found) {
+            sourceRecord = found
+            sourceSlot = candidateSlot
+            break
+          }
+        }
+
+        if (!sourceRecord) {
+          return { success: false, message: "No previous attendance found (checked previous two periods)." }
+        }
+
+        const sourceById = new Map(sourceRecord.students.map((student) => [student.id, student.status]))
+        const sourceByRoll = new Map(sourceRecord.students.map((student) => [student.rollNumber, student.status]))
+
+        set((prev) => ({
+          students: prev.students.map((student) => ({
+            ...student,
+            status:
+              sourceById.get(student.id) ||
+              sourceByRoll.get(student.rollNumber) ||
+              student.status,
+          })),
+        }))
+
+        return { success: true, message: `Copied attendance from ${sourceSlot}.` }
+      },
+
       submitAttendance: (cell) => {
         const state = get()
         const contiguousIds = getContiguousSubjectIds(state.timetable, cell)
         const mergedTimeSlot = getMergedTimeSlotLabel(state.timetable, contiguousIds)
 
         if (state.isViewingSubmittedAttendance && state.isEditMode && state.activeRecordId) {
+          const activeRecord = state.attendanceRecords.find((record) => record.id === state.activeRecordId)
+          if (!activeRecord) {
+            return {
+              success: false,
+              mode: "no-change" as const,
+              message: "Original attendance record not found.",
+            }
+          }
+
+          const changes = state.students
+            .map((student) => {
+              const original = activeRecord.students.find((item) => item.id === student.id)
+              if (!original || original.status === student.status) return null
+
+              return {
+                studentId: student.id,
+                rollNumber: student.rollNumber,
+                studentName: student.name,
+                fromStatus: original.status,
+                toStatus: student.status,
+              }
+            })
+            .filter((change): change is CorrectionChange => change !== null)
+
+          if (changes.length === 0) {
+            return {
+              success: false,
+              mode: "no-change" as const,
+              message: "No attendance changes detected.",
+            }
+          }
+
+          if (state.user?.role !== "faculty") {
+            const now = new Date().toISOString()
+            const requestedBy = `${state.user?.role.toUpperCase()} - ${state.user?.name}`
+            const reason = `Requested correction for ${changes.length} student(s).`
+
+            set((prev) => {
+              const existingPending = prev.correctionRequests.find(
+                (request) =>
+                  request.status === "pending" &&
+                  request.recordId === activeRecord.id &&
+                  request.requestedBy === requestedBy
+              )
+
+              const requestPayload: CorrectionRequest = {
+                id: existingPending?.id || Date.now().toString(),
+                recordId: activeRecord.id,
+                subject: activeRecord.subject,
+                subjectCode: activeRecord.subjectCode,
+                date: activeRecord.date,
+                timeSlot: activeRecord.timeSlot,
+                className: activeRecord.className,
+                facultyName: cell.facultyName || "Faculty Assigned",
+                reason,
+                changes,
+                requestedAt: now,
+                requestedBy,
+                status: "pending",
+              }
+
+              const nextRequests = existingPending
+                ? prev.correctionRequests.map((request) =>
+                    request.id === existingPending.id ? requestPayload : request
+                  )
+                : [requestPayload, ...prev.correctionRequests]
+
+              return {
+                correctionRequests: nextRequests,
+                notifications: [
+                  {
+                    id: (Date.now() + 1).toString(),
+                    title: "New Correction Request",
+                    message: `${activeRecord.subjectCode} (${activeRecord.timeSlot}) correction requested by ${state.user?.name}.`,
+                    createdAt: now,
+                    targetRole: "faculty",
+                    read: false,
+                  },
+                  ...prev.notifications,
+                ],
+                students: withPresentStatus(prev.classStudents),
+                selectedCell: null,
+                activeRecordId: null,
+                isViewingSubmittedAttendance: false,
+                isEditMode: false,
+                currentPage: "dashboard",
+              }
+            })
+
+            return {
+              success: true,
+              mode: "request-created" as const,
+              message: "Correction request submitted to faculty.",
+            }
+          }
+
           const editedAt = new Date().toISOString()
           const editedBy = `${state.user?.role.toUpperCase()} - ${state.user?.name}`
 
@@ -457,7 +632,11 @@ export const useAppStore = create<AppState>()(
             }
           })
 
-          return
+          return {
+            success: true,
+            mode: "updated" as const,
+            message: "Attendance updated successfully.",
+          }
         }
 
         const newRecord: AttendanceRecord = {
@@ -490,6 +669,12 @@ export const useAppStore = create<AppState>()(
             currentPage: "dashboard",
           }
         })
+
+        return {
+          success: true,
+          mode: "submitted" as const,
+          message: "Attendance submitted successfully.",
+        }
       },
 
       setSelectedCell: (cell) =>
@@ -714,17 +899,47 @@ export const useAppStore = create<AppState>()(
         }),
 
       approveCorrectionRequest: (requestId) =>
-        set((state) => ({
-          correctionRequests: state.correctionRequests.map((request) =>
-            request.id === requestId ? { ...request, status: "approved" as const } : request
-          ),
-        })),
+        set((state) => {
+          const request = state.correctionRequests.find((item) => item.id === requestId)
+          if (!request) return {}
+
+          const updatedRecords = request.recordId && request.changes && request.changes.length > 0
+            ? state.attendanceRecords.map((record) => {
+                if (record.id !== request.recordId) return record
+
+                return {
+                  ...record,
+                  students: record.students.map((student) => {
+                    const change = request.changes?.find((item) => item.studentId === student.id)
+                    return change ? { ...student, status: change.toStatus } : student
+                  }),
+                  editedAt: new Date().toISOString(),
+                  editedBy: `${state.user?.role.toUpperCase()} - ${state.user?.name}`,
+                  isEdited: true,
+                }
+              })
+            : state.attendanceRecords
+
+          saveAttendanceRecordsToStorage(updatedRecords)
+
+          return {
+            correctionRequests: state.correctionRequests.map((item) =>
+              item.id === requestId ? { ...item, status: "approved" as const } : item
+            ),
+            attendanceRecords: updatedRecords,
+          }
+        }),
 
       rejectCorrectionRequest: (requestId) =>
         set((state) => ({
           correctionRequests: state.correctionRequests.map((request) =>
             request.id === requestId ? { ...request, status: "rejected" as const } : request
           ),
+        })),
+
+      deleteCorrectionRequest: (requestId) =>
+        set((state) => ({
+          correctionRequests: state.correctionRequests.filter((request) => request.id !== requestId),
         })),
 
       addTimetableEntry: ({ day, timeSlot, subjectCode, facultyName }) =>

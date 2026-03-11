@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Bell, User, Shield, School, CalendarDays, Users } from "lucide-react"
+import { Bell, User, Shield, School } from "lucide-react"
 import { useAppStore } from "@/lib/store"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { toast } from "react-toastify"
 
 export function Settings() {
-  const { user, setCurrentPage, appSettings, updateAppSettings, updateUserProfile } = useAppStore()
+  const { user, appSettings, updateAppSettings, updateUserProfile } = useAppStore()
   const [name, setName] = useState(user?.name || "")
   const [email, setEmail] = useState(user?.email || "")
   const [isEditingProfile, setIsEditingProfile] = useState(false)
@@ -321,35 +321,6 @@ export function Settings() {
         </CardContent>
       </Card>
 
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            <CalendarDays className="h-5 w-5" />
-            Timetable Management
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Open the timetable editor to add, edit, or delete schedule entries
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={() => setCurrentPage("timetable-editor")}>Open Timetable Editor</Button>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            <Users className="h-5 w-5" />
-            Student Management
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Open student manager to add, edit, delete, or import class list
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={() => setCurrentPage("student-manager")}>Open Student Manager</Button>
-        </CardContent>
-      </Card>
     </div>
   )
 }
