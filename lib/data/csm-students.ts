@@ -1,4 +1,4 @@
-import type { Student } from "@/lib/store"
+import type { Student } from "@/types"
 
 export const csmStudents: Student[] = [
   {

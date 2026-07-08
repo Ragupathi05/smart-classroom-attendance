@@ -1,0 +1,6 @@
+export * from "./AuthService"
+export * from "./AttendanceService"
+export * from "./StudentService"
+export * from "./TimetableService"
+export * from "./SettingsService"
+export * from "./CorrectionService"

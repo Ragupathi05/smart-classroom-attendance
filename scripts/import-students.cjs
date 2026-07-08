@@ -14,7 +14,7 @@ const students = rows
     status: "present",
   }));
 
-const out = `import type { Student } from "@/lib/store"\n\nexport const csmStudents: Student[] = ${JSON.stringify(students, null, 2)}\n`;
+const out = `import type { Student } from "@/types"\n\nexport const csmStudents: Student[] = ${JSON.stringify(students, null, 2)}\n`;
 fs.mkdirSync("lib/data", { recursive: true });
 fs.writeFileSync("lib/data/csm-students.ts", out);
 
