@@ -61,6 +61,25 @@ export const SUBJECT_FACULTY: Record<string, string> = {
   MM: "Class Mentor",
 }
 
+export const SUBJECT_ROOMS: Record<string, string> = {
+  BDA: "Room 301",
+  CCAI: "Room 302",
+  DL: "Room 303",
+  ATCD: "Room 304",
+  RL: "Room 305",
+  EB: "Room 306",
+  RM: "Room 307",
+  "BDCC LAB": "CSM Lab 1",
+  "DL LAB": "CSM Lab 2",
+  SS: "Seminar Hall",
+  "SS (SEC)": "Seminar Hall",
+  "SS LAB (SEC)": "Language Lab",
+  "T LAB": "Tinkering Lab",
+  APTITUDE: "Room 301",
+  VERBAL: "Room 302",
+  MM: "Room 303",
+}
+
 export const WEEKLY_SCHEDULE: Record<string, string[]> = {
   Monday: ["DL", "SS", "EB", "CCAI", "DL LAB", "DL LAB", "DL LAB"],
   Tuesday: ["CCAI", "SS (SEC)", "MM", "RL", "BDA", "ATCD", "RM"],

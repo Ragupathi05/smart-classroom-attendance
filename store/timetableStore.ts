@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
-import type { TimetableCell } from "@/types"
+import type { TimetableCell, SpecialDay, TimetableCellClassType } from "@/types"
 import { TimetableService } from "@/services"
 import { getISOWeekKey } from "@/utils/date-helpers"
 import { SUBJECTS, SUBJECT_FACULTY } from "@/constants"
@@ -9,16 +9,18 @@ interface TimetableState {
   timetable: TimetableCell[]
   selectedCell: TimetableCell | null
   timetableWeekKey: string
+  specialDays: Record<string, SpecialDay>
   setSelectedCell: (cell: TimetableCell | null) => void
-  addTimetableEntry: (entry: { day: string; timeSlot: string; subjectCode: string; facultyName: string }) => void
-  updateTimetableEntry: (id: string, entry: { day: string; timeSlot: string; subjectCode: string; facultyName: string }) => void
+  addTimetableEntry: (entry: { day: string; timeSlot: string; subjectCode: string; facultyName: string; type?: TimetableCellClassType }) => void
+  updateTimetableEntry: (id: string, entry: { day: string; timeSlot: string; subjectCode: string; facultyName: string; type?: TimetableCellClassType }) => void
   deleteTimetableEntry: (id: string) => void
+  setSpecialDay: (date: string, type: SpecialDay["type"] | null, reason?: string) => void
   ensureWeeklyTimetableReset: () => void
 }
 
 const getLegacyTimetableState = () => {
   const defaults = TimetableService.generateTimetable()
-  if (typeof window === "undefined") return { timetable: defaults, selectedCell: null, timetableWeekKey: getISOWeekKey() }
+  if (typeof window === "undefined") return { timetable: defaults, selectedCell: null, timetableWeekKey: getISOWeekKey(), specialDays: {} }
   try {
     const raw = localStorage.getItem("attendance-app-store-v1")
     if (raw) {
@@ -28,11 +30,12 @@ const getLegacyTimetableState = () => {
           timetable: parsed.state.timetable || defaults,
           selectedCell: parsed.state.selectedCell || null,
           timetableWeekKey: parsed.state.timetableWeekKey || getISOWeekKey(),
+          specialDays: parsed.state.specialDays || {},
         }
       }
     }
   } catch {}
-  return { timetable: defaults, selectedCell: null, timetableWeekKey: getISOWeekKey() }
+  return { timetable: defaults, selectedCell: null, timetableWeekKey: getISOWeekKey(), specialDays: {} }
 }
 
 const legacy = getLegacyTimetableState()
@@ -43,10 +46,11 @@ export const useTimetableStore = create<TimetableState>()(
       timetable: legacy.timetable,
       selectedCell: legacy.selectedCell,
       timetableWeekKey: legacy.timetableWeekKey,
+      specialDays: legacy.specialDays,
 
       setSelectedCell: (cell) => set({ selectedCell: cell }),
 
-      addTimetableEntry: ({ day, timeSlot, subjectCode, facultyName }) =>
+      addTimetableEntry: ({ day, timeSlot, subjectCode, facultyName, type = "regular" }) =>
         set((state) => {
           const normalizedSubject = subjectCode.trim().toUpperCase()
           const normalizedFaculty =
@@ -64,6 +68,7 @@ export const useTimetableStore = create<TimetableState>()(
                       subjectName: SUBJECTS[normalizedSubject] ?? normalizedSubject,
                       facultyName: normalizedFaculty,
                       status: "upcoming" as const,
+                      type,
                     }
                   : entry
               ),
@@ -78,6 +83,7 @@ export const useTimetableStore = create<TimetableState>()(
             subjectName: SUBJECTS[normalizedSubject] ?? normalizedSubject,
             facultyName: normalizedFaculty,
             status: "upcoming",
+            type,
           }
 
           return {
@@ -85,7 +91,7 @@ export const useTimetableStore = create<TimetableState>()(
           }
         }),
 
-      updateTimetableEntry: (id, { day, timeSlot, subjectCode, facultyName }) =>
+      updateTimetableEntry: (id, { day, timeSlot, subjectCode, facultyName, type = "regular" }) =>
         set((state) => {
           const normalizedSubject = subjectCode.trim().toUpperCase()
           const normalizedFaculty =
@@ -103,6 +109,7 @@ export const useTimetableStore = create<TimetableState>()(
                     subjectName: SUBJECTS[normalizedSubject] ?? normalizedSubject,
                     facultyName: normalizedFaculty,
                     status: "upcoming" as const,
+                    type,
                   }
                 : entry
             ),
@@ -113,6 +120,17 @@ export const useTimetableStore = create<TimetableState>()(
         set((state) => ({
           timetable: state.timetable.filter((entry) => entry.id !== id),
         })),
+
+      setSpecialDay: (date, type, reason) =>
+        set((state) => {
+          const updated = { ...state.specialDays }
+          if (type === null) {
+            delete updated[date]
+          } else {
+            updated[date] = { date, type, reason }
+          }
+          return { specialDays: updated }
+        }),
 
       ensureWeeklyTimetableReset: () => {
         const currentWeekKey = getISOWeekKey()

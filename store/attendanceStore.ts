@@ -15,6 +15,7 @@ interface AttendanceState {
   isViewingSubmittedAttendance: boolean
   isEditMode: boolean
   correctionRequests: CorrectionRequest[]
+  attendanceDrafts: Record<string, { cellId: string; students: Student[]; lastUpdated: string }>
 
   updateStudentStatus: (studentId: string, status: AttendanceStatus) => void
   copyPreviousPeriodAttendance: (cell: TimetableCell) => { success: boolean; message: string }
@@ -37,7 +38,7 @@ interface AttendanceState {
 const getLegacyAttendanceState = () => {
   const records = AttendanceService.loadRecords()
   const defaultStudents = StudentService.getSeedStudents()
-  if (typeof window === "undefined") return { attendanceRecords: records, students: defaultStudents, correctionRequests: [] }
+  if (typeof window === "undefined") return { attendanceRecords: records, students: defaultStudents, correctionRequests: [], attendanceDrafts: {} }
   try {
     const raw = localStorage.getItem("attendance-app-store-v1")
     if (raw) {
@@ -47,11 +48,14 @@ const getLegacyAttendanceState = () => {
           attendanceRecords: parsed.state.attendanceRecords || records,
           students: parsed.state.students || defaultStudents,
           correctionRequests: parsed.state.correctionRequests || [],
+          attendanceDrafts: parsed.state.attendanceDrafts || {},
         }
       }
     }
-  } catch {}
-  return { attendanceRecords: records, students: defaultStudents, correctionRequests: [] }
+  } catch {
+    // Ignore
+  }
+  return { attendanceRecords: records, students: defaultStudents, correctionRequests: [], attendanceDrafts: {} }
 }
 
 const legacy = getLegacyAttendanceState()
@@ -118,13 +122,29 @@ export const useAttendanceStore = create<AttendanceState>()(
       isViewingSubmittedAttendance: false,
       isEditMode: false,
       correctionRequests: legacy.correctionRequests,
+      attendanceDrafts: legacy.attendanceDrafts,
 
       updateStudentStatus: (studentId, status) =>
-        set((state) => ({
-          students: state.students.map((student) =>
+        set((state) => {
+          const updatedStudents = state.students.map((student) =>
             student.id === studentId ? { ...student, status } : student
-          ),
-        })),
+          )
+          
+          const selectedCell = useTimetableStore.getState().selectedCell
+          const draftUpdates: Partial<AttendanceState> = { students: updatedStudents }
+          
+          if (selectedCell && selectedCell.status !== "submitted") {
+            const drafts = { ...(state.attendanceDrafts || {}) }
+            drafts[selectedCell.id] = {
+              cellId: selectedCell.id,
+              students: updatedStudents,
+              lastUpdated: new Date().toISOString()
+            }
+            draftUpdates.attendanceDrafts = drafts
+          }
+
+          return draftUpdates
+        }),
 
       copyPreviousPeriodAttendance: (cell) => {
         const timetable = useTimetableStore.getState().timetable
@@ -173,15 +193,27 @@ export const useAttendanceStore = create<AttendanceState>()(
         const sourceById = new Map(sourceRecord.students.map((student) => [student.id, student.status]))
         const sourceByRoll = new Map(sourceRecord.students.map((student) => [student.rollNumber, student.status]))
 
-        set((prev) => ({
-          students: prev.students.map((student) => ({
+        set((prev) => {
+          const updatedStudents = prev.students.map((student) => ({
             ...student,
             status:
               sourceById.get(student.id) ||
               sourceByRoll.get(student.rollNumber) ||
               student.status,
-          })),
-        }))
+          }))
+
+          const drafts = { ...(prev.attendanceDrafts || {}) }
+          drafts[cell.id] = {
+            cellId: cell.id,
+            students: updatedStudents,
+            lastUpdated: new Date().toISOString(),
+          }
+
+          return {
+            students: updatedStudents,
+            attendanceDrafts: drafts,
+          }
+        })
 
         return { success: true, message: `Copied attendance from ${sourceSlot}.` }
       },
@@ -347,7 +379,7 @@ export const useAttendanceStore = create<AttendanceState>()(
         set((prev) => {
           const nextRecords = [newRecord, ...prev.attendanceRecords]
           AttendanceService.saveRecords(nextRecords)
-
+ 
           // Update status in timetable grid
           useTimetableStore.setState((tState) => ({
             timetable: tState.timetable.map((entry) =>
@@ -355,12 +387,16 @@ export const useAttendanceStore = create<AttendanceState>()(
             ),
           }))
 
+          const drafts = { ...(prev.attendanceDrafts || {}) }
+          delete drafts[cell.id]
+ 
           return {
             attendanceRecords: nextRecords,
             students: classStudents.map((student) => ({ ...student, status: "present" })),
             activeRecordId: null,
             isViewingSubmittedAttendance: false,
             isEditMode: false,
+            attendanceDrafts: drafts,
           }
         })
 
@@ -585,25 +621,45 @@ useTimetableStore.subscribe((state) => {
 
   const attendanceState = useAttendanceStore.getState()
   if (cell.status !== "submitted") {
-    const roster = useStudentStore.getState().classStudents
-    useAttendanceStore.setState({
-      students: roster.map((s) => ({ ...s, status: "present" })),
-      activeRecordId: null,
-      isViewingSubmittedAttendance: false,
-      isEditMode: false,
-    })
+    const draft = attendanceState.attendanceDrafts?.[cell.id]
+    if (draft) {
+      useAttendanceStore.setState({
+        students: draft.students.map((s) => ({ ...s })),
+        activeRecordId: null,
+        isViewingSubmittedAttendance: false,
+        isEditMode: false,
+      })
+    } else {
+      const roster = useStudentStore.getState().classStudents
+      useAttendanceStore.setState({
+        students: roster.map((s) => ({ ...s, status: "present" })),
+        activeRecordId: null,
+        isViewingSubmittedAttendance: false,
+        isEditMode: false,
+      })
+    }
     return
   }
 
   const record = findAttendanceRecordForCell(attendanceState.attendanceRecords, cell)
   if (!record) {
-    const roster = useStudentStore.getState().classStudents
-    useAttendanceStore.setState({
-      students: roster.map((s) => ({ ...s, status: "present" })),
-      activeRecordId: null,
-      isViewingSubmittedAttendance: false,
-      isEditMode: false,
-    })
+    const draft = attendanceState.attendanceDrafts?.[cell.id]
+    if (draft) {
+      useAttendanceStore.setState({
+        students: draft.students.map((s) => ({ ...s })),
+        activeRecordId: null,
+        isViewingSubmittedAttendance: false,
+        isEditMode: false,
+      })
+    } else {
+      const roster = useStudentStore.getState().classStudents
+      useAttendanceStore.setState({
+        students: roster.map((s) => ({ ...s, status: "present" })),
+        activeRecordId: null,
+        isViewingSubmittedAttendance: false,
+        isEditMode: false,
+      })
+    }
     return
   }
 

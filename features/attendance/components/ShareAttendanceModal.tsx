@@ -178,6 +178,34 @@ export function ShareAttendanceModal({ open, onClose, data }: ShareAttendanceMod
     }
   }
 
+  const handleExportExcel = () => {
+    const rows = [
+      ["Attendance Report", ""],
+      ["Subject", subject],
+      ["Date", formattedDate],
+      ["Present Count", presentCount],
+      ["Permission Count", permissionCount],
+      ["Absent Count", absentCount],
+      [],
+      ["Absentee Student List"],
+      ["Roll Number", "Name", "Status"],
+      ...absentStudents.map((s) => [s.rollNumber, s.name, s.status])
+    ]
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + rows.map(e => e.map(val => `"${val}"`).join(",")).join("\n")
+      
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", `Attendance_Report_${subject}_${date}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    toast({ title: "Excel Exported", description: "CSV report downloaded successfully." })
+  }
+
   const handleEmail = () => {
     const subjectLine = encodeURIComponent(`Attendance Report - ${subject} - ${formattedDate}`)
     const body = encodeURIComponent(generateReport())
@@ -196,7 +224,7 @@ export function ShareAttendanceModal({ open, onClose, data }: ShareAttendanceMod
       <DialogContent className="max-w-2xl border-border/70 bg-card/95 p-0 shadow-2xl backdrop-blur-sm">
         <DialogHeader>
           <div className="rounded-t-xl border-b border-border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-6 py-5">
-            <DialogTitle className="text-xl text-foreground">ShareAttendanceModal</DialogTitle>
+            <DialogTitle className="text-xl text-foreground">Share Center</DialogTitle>
             <DialogDescription className="mt-1 text-muted-foreground">
               Attendance submitted successfully. Share or export the report.
             </DialogDescription>
@@ -251,20 +279,24 @@ export function ShareAttendanceModal({ open, onClose, data }: ShareAttendanceMod
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Button variant="outline" className="gap-2" onClick={handleDownloadPdf}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Button variant="outline" className="gap-2 text-xs" onClick={handleDownloadPdf}>
               <Download className="h-4 w-4" />
               Download PDF
             </Button>
-            <Button variant="outline" className="gap-2" onClick={handleCopyAbsentees}>
-              {copiedAbsentees ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {copiedAbsentees ? "Copied Absentees" : "Copy Absentee List"}
+            <Button variant="outline" className="gap-2 text-xs" onClick={handleExportExcel}>
+              <Download className="h-4 w-4" />
+              Export Excel
             </Button>
-            <Button variant="outline" className="gap-2" onClick={handleWhatsApp}>
+            <Button variant="outline" className="gap-2 text-xs" onClick={handleCopyAbsentees}>
+              {copiedAbsentees ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copiedAbsentees ? "Copied" : "Copy Absentees"}
+            </Button>
+            <Button variant="outline" className="gap-2 text-xs sm:col-span-2" onClick={handleWhatsApp}>
               <MessageCircle className="h-4 w-4" />
               Share WhatsApp
             </Button>
-            <Button variant="outline" className="gap-2" onClick={handleEmail}>
+            <Button variant="outline" className="gap-2 text-xs sm:col-span-1" onClick={handleEmail}>
               <Send className="h-4 w-4" />
               Send Email
             </Button>

@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react"
 import { ArrowLeft, Search, PencilLine, Save, Share2, Trash2, Hand } from "lucide-react"
-import { useAttendanceStore, useAuthStore } from "@/store"
+import { useAttendanceStore, useAuthStore, useTimetableStore, useSessionStore } from "@/store"
 import type { AttendanceRecord, AttendanceStatus, Student } from "@/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -26,6 +26,8 @@ import { formatDate, formatDateTime, formatTimeSlotLabel } from "@/utils/date-he
 import { getCounts, isWithinAllowedWindow, formatShortRoll } from "@/utils/attendance-helpers"
 import { AttendanceHistoryDetail } from "../components/AttendanceHistoryDetail"
 
+const LONG_PRESS_MS = 500
+
 const statusOptions: { value: AttendanceStatus; label: string; colorClass: string }[] = [
   { value: "present", label: "Present", colorClass: "text-green-600" },
   { value: "permission", label: "Permission", colorClass: "text-yellow-600" },
@@ -38,6 +40,8 @@ export function AttendanceHistoryPage() {
     updateAttendanceRecordFromHistory,
     deleteAttendanceRecord,
   } = useAttendanceStore()
+  const { specialDays } = useTimetableStore()
+  const { sessionRecords } = useSessionStore()
   const { user } = useAuthStore()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
@@ -52,18 +56,60 @@ export function AttendanceHistoryPage() {
   const filteredRecords = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
 
-    return attendanceRecords.filter((record) => {
-      const matchesSearch =
-        normalizedSearch.length === 0 ||
-        record.subject.toLowerCase().includes(normalizedSearch) ||
-        record.subjectCode.toLowerCase().includes(normalizedSearch) ||
-        record.date.includes(normalizedSearch)
+    const attendanceItems = attendanceRecords.map((r) => ({
+      id: r.id,
+      date: r.date,
+      type: "record" as const,
+      subjectCode: r.subjectCode,
+      subject: r.subject,
+      timeSlot: r.timeSlot,
+      isEdited: r.isEdited,
+      students: r.students,
+      rawRecord: r
+    }))
 
-      const matchesDate = selectedDate.length === 0 || record.date === selectedDate
+    const specialDayItems = Object.values(specialDays || {}).map((d) => ({
+      id: `special-${d.date}`,
+      date: d.date,
+      type: "special-day" as const,
+      subjectCode: "CAL",
+      subject: d.reason || `Calendar Override: ${d.type}`,
+      timeSlot: "Full Day",
+      isEdited: false,
+      students: [],
+      specialType: d.type
+    }))
 
-      return matchesSearch && matchesDate
-    })
-  }, [attendanceRecords, searchTerm, selectedDate])
+    const sessionOverridesItems = Object.values(sessionRecords || {})
+      .filter((s) => s.attendanceStatus === "skipped" || s.attendanceRequired === "Not Required")
+      .map((s) => ({
+        id: s.id,
+        date: s.date,
+        type: "special-day" as const,
+        subjectCode: s.subjectCode,
+        subject: `${s.subjectName}${s.notes ? ` - Notes: ${s.notes}` : ""}`,
+        timeSlot: s.period,
+        isEdited: false,
+        students: [],
+        specialType: s.currentSessionType
+      }))
+
+    const combined = [...attendanceItems, ...specialDayItems, ...sessionOverridesItems]
+
+    return combined
+      .filter((item) => {
+        const matchesSearch =
+          normalizedSearch.length === 0 ||
+          item.subject.toLowerCase().includes(normalizedSearch) ||
+          item.subjectCode.toLowerCase().includes(normalizedSearch) ||
+          item.date.includes(normalizedSearch)
+
+        const matchesDate = selectedDate.length === 0 || item.date === selectedDate
+
+        return matchesSearch && matchesDate
+      })
+      .sort((a, b) => b.date.localeCompare(a.date))
+  }, [attendanceRecords, specialDays, searchTerm, selectedDate, sessionRecords])
 
   const openDetail = (record: AttendanceRecord) => {
     setSelectedRecord(record)
@@ -301,43 +347,81 @@ Absent: ${counts.absent}`
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredRecords.map((record) => {
-                const counts = getCounts(record.students)
+              {filteredRecords.map((item) => {
+                if (item.type === "special-day") {
+                  return (
+                    <TableRow
+                      key={item.id}
+                      className="cursor-not-allowed border-border bg-slate-500/5 transition-colors hover:bg-slate-500/10"
+                    >
+                      <TableCell className="font-semibold text-muted-foreground">{formatDate(item.date)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded bg-indigo-500/10 px-2 py-1 text-xs font-bold text-indigo-650">
+                            {item.subjectCode}
+                          </span>
+                          <span className="text-foreground font-medium">{item.subject}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{item.timeSlot}</TableCell>
+                      <TableCell className="text-center text-muted-foreground">—</TableCell>
+                      <TableCell className="text-center text-muted-foreground">—</TableCell>
+                      <TableCell className="text-center text-muted-foreground">—</TableCell>
+                      <TableCell>
+                        <Badge className={`capitalize text-[10px] font-extrabold ${
+                          item.specialType === "holiday" ? "bg-rose-100 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 hover:bg-rose-100" :
+                          item.specialType === "examination" || item.specialType === "exam" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-400 hover:bg-yellow-100" :
+                          item.specialType === "cancelled" ? "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400 hover:bg-red-100 line-through" :
+                          item.specialType === "seminar" ? "bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 hover:bg-purple-100" :
+                          item.specialType === "workshop" ? "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 hover:bg-amber-100" :
+                          item.specialType === "guest_lecture" ? "bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 hover:bg-blue-100" :
+                          item.specialType === "industrial_visit" ? "bg-teal-100 text-teal-700 dark:bg-teal-950/30 dark:text-teal-400 hover:bg-teal-100" :
+                          item.specialType === "extra_class" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 hover:bg-emerald-100" :
+                          "bg-slate-100 text-slate-700 dark:bg-slate-900/60 dark:text-slate-400 hover:bg-slate-100"
+                        }`}>
+                          {item.specialType ? item.specialType.replace("_", " ") : "Special Day"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  )
+                }
+
+                const counts = getCounts(item.students)
                 return (
                   <TableRow
-                    key={record.id}
+                    key={item.id}
                     className="cursor-pointer border-border transition-colors hover:bg-muted/40"
-                    onClick={() => handleRowClick(record)}
-                    onPointerDown={() => startLongPress(record.id)}
+                    onClick={() => handleRowClick(item.rawRecord)}
+                    onPointerDown={() => startLongPress(item.id)}
                     onPointerUp={endLongPress}
                     onPointerLeave={endLongPress}
                     onPointerCancel={endLongPress}
                   >
-                    <TableCell className="font-medium text-foreground">{formatDate(record.date)}</TableCell>
+                    <TableCell className="font-medium text-foreground">{formatDate(item.date)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="rounded bg-primary/10 px-2 py-1 text-xs font-bold text-primary">
-                          {record.subjectCode}
+                          {item.subjectCode}
                         </span>
-                        <span className="text-foreground">{record.subject}</span>
+                        <span className="text-foreground">{item.subject}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-foreground">{record.timeSlot}</TableCell>
+                    <TableCell className="text-sm text-foreground">{item.timeSlot}</TableCell>
                     <TableCell className="text-center text-green-600">{counts.present}</TableCell>
                     <TableCell className="text-center text-yellow-600">{counts.permission}</TableCell>
                     <TableCell className="text-center text-red-600">{counts.absent}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Badge className={record.isEdited ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"}>
-                          {record.isEdited ? "Edited" : "Submitted"}
+                        <Badge className={item.isEdited ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"}>
+                          {item.isEdited ? "Edited" : "Submitted"}
                         </Badge>
-                        {longPressedRecordId === record.id ? (
+                        {longPressedRecordId === item.id ? (
                           <Button
                             size="sm"
                             variant="destructive"
                             onClick={(event) => {
                               event.stopPropagation()
-                              handleRemoveRecord(record)
+                              handleRemoveRecord(item.rawRecord)
                             }}
                           >
                             <Trash2 className="mr-1 h-4 w-4" />

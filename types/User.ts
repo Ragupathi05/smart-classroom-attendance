@@ -6,4 +6,9 @@ export interface User {
   role: UserRole
   className: string
   email?: string
+  department?: string
+  year?: string
+  section?: string
+  phone?: string
+  mentor?: string
 }

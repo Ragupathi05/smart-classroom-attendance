@@ -15,6 +15,11 @@ export class AuthService {
       role,
       className: CLASS_NAME,
       email: `${userId}@college.edu`,
+      department: "Computer Science & Engineering",
+      year: "III Year",
+      section: "A",
+      phone: "9876543210",
+      mentor: "Dr. Arunkumar",
     }
   }
 }

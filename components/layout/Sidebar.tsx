@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button"
 
 const navigation = [
   { name: "Dashboard", icon: LayoutDashboard, page: "dashboard" },
-  { name: "Mark Attendance", icon: ClipboardCheck, page: "mark-attendance" },
   { name: "Corrections", icon: FileEdit, page: "corrections" },
   { name: "Analytics", icon: BarChart3, page: "analytics" },
   { name: "History", icon: History, page: "history" },

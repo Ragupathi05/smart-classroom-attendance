@@ -8,7 +8,15 @@ interface AuthState {
   isAuthenticated: boolean
   login: (userId: string, password: string, role: UserRole) => Promise<boolean>
   logout: () => void
-  updateUserProfile: (payload: { name: string; email: string }) => { success: boolean; message: string }
+  updateUserProfile: (payload: {
+    name: string
+    email: string
+    department?: string
+    year?: string
+    section?: string
+    phone?: string
+    mentor?: string
+  }) => { success: boolean; message: string }
 }
 
 const getLegacyAuthState = () => {
@@ -52,7 +60,7 @@ export const useAuthStore = create<AuthState>()(
         set({ user: null, isAuthenticated: false })
       },
 
-      updateUserProfile: ({ name, email }) => {
+      updateUserProfile: ({ name, email, department, year, section, phone, mentor }) => {
         const trimmedName = name.trim()
         const trimmedEmail = email.trim().toLowerCase()
 
@@ -71,6 +79,11 @@ export const useAuthStore = create<AuthState>()(
                 ...state.user,
                 name: trimmedName,
                 email: trimmedEmail,
+                department: department?.trim(),
+                year: year?.trim(),
+                section: section?.trim(),
+                phone: phone?.trim(),
+                mentor: mentor?.trim(),
               }
             : null,
         }))

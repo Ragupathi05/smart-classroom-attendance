@@ -43,3 +43,17 @@ export function getISOWeekKey(date = new Date()): string {
   const weekNo = Math.ceil((((utcDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
   return `${utcDate.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`
 }
+
+export function getLocalDateStringForDay(dayName: string): string {
+  const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+  const targetIndex = daysOfWeek.indexOf(dayName)
+  if (targetIndex === -1) return ""
+  
+  const now = new Date()
+  const currentDayIndex = now.getDay()
+  const diff = targetIndex - currentDayIndex
+  const targetDate = new Date(now)
+  targetDate.setDate(now.getDate() + diff)
+  
+  return targetDate.toISOString().split("T")[0]
+}
