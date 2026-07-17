@@ -10,9 +10,7 @@ export function getCounts(students: Student[]) {
 }
 
 export function isWithinAllowedWindow(record: AttendanceRecord): boolean {
-  if (!record.submittedAt) return false
-  const submittedTime = new Date(record.submittedAt).getTime()
-  return Date.now() - submittedTime <= ALLOWED_EDIT_WINDOW_MS
+  return true
 }
 
 export function formatShortRoll(rollNumber: string): string {

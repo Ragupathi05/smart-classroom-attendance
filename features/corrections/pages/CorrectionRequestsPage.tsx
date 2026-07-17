@@ -2,7 +2,7 @@
 
 import { Fragment, useRef, useState } from "react"
 import { Check, X, Clock, Share2 } from "lucide-react"
-import { useAttendanceStore, useAuthStore } from "@/store"
+import { useAttendanceStore, useAuthStore, useConfirmStore } from "@/store"
 import type { CorrectionRequest } from "@/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -30,6 +30,7 @@ export function CorrectionRequests() {
   } = useAttendanceStore()
   const { user } = useAuthStore()
   const { toast } = useToast()
+  const confirm = useConfirmStore((state) => state.confirm)
   const [expandedRequestId, setExpandedRequestId] = useState<string | null>(null)
   const [actionRequestId, setActionRequestId] = useState<string | null>(null)
   const longPressTimer = useRef<number | null>(null)
@@ -96,16 +97,21 @@ export function CorrectionRequests() {
   }
 
   const handleDelete = (requestId: string) => {
-    const confirmed = window.confirm("Delete this correction request?")
-    if (!confirmed) return
-    deleteCorrectionRequest(requestId)
-    if (expandedRequestId === requestId) {
-      setExpandedRequestId(null)
-    }
-    setActionRequestId(null)
-    toast({
-      title: "Request Deleted",
-      description: "Correction request removed.",
+    confirm({
+      title: "Delete Correction Request",
+      message: "Are you sure you want to delete this correction request? This action cannot be undone.",
+      confirmText: "Delete",
+      onConfirm: () => {
+        deleteCorrectionRequest(requestId)
+        if (expandedRequestId === requestId) {
+          setExpandedRequestId(null)
+        }
+        setActionRequestId(null)
+        toast({
+          title: "Request Deleted",
+          description: "Correction request removed.",
+        })
+      }
     })
   }
 

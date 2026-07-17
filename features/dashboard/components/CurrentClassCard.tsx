@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useMemo, useState } from "react"
-import { useTimetableStore, useAttendanceStore, useSharedStore, useAuthStore, useSessionStore } from "@/store"
+import { useTimetableStore, useAttendanceStore, useSharedStore, useAuthStore, useSessionStore, useAcademicStore } from "@/store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,7 +25,8 @@ const slotEndToMinutes = (slot: string): number => {
 }
 
 export function CurrentClassCard() {
-  const { timetable, setSelectedCell, specialDays } = useTimetableStore()
+  const { timetable, setSelectedCell, specialDays, currentSectionFilter } = useTimetableStore()
+  const { sections } = useAcademicStore()
   const { attendanceRecords, correctionRequests } = useAttendanceStore()
   const { setCurrentPage } = useSharedStore()
   const { user } = useAuthStore()
@@ -161,9 +162,35 @@ export function CurrentClassCard() {
   }
 
   const todayDateStr = now.toISOString().split("T")[0]
-  const specialDayToday = specialDays?.[todayDateStr]
+  const specialDayToday = useMemo(() => {
+    const specialDay = specialDays?.[todayDateStr]
+    if (!specialDay) return null
+    
+    let scopeMatch = false
+    const activeSection = sections.find(s => s.id === currentSectionFilter)
 
-  if (specialDayToday && specialDayToday.type === "holiday") {
+    if (!specialDay.scopeType || specialDay.scopeType === "all") {
+      scopeMatch = true
+    } else if (specialDay.scopeType === "batch") {
+      if (activeSection && specialDay.scopeTargetIds?.includes(activeSection.batchId)) {
+        scopeMatch = true
+      }
+    } else if (specialDay.scopeType === "section") {
+      if (specialDay.scopeTargetIds?.includes(currentSectionFilter)) {
+        scopeMatch = true
+      }
+    }
+
+    if (!scopeMatch) return null
+
+    return specialDay
+  }, [specialDays, todayDateStr, currentSectionFilter, sections])
+
+  // If specialDay has period restrictions, only show the special day card when the active period matches
+  const isSpecialDayPeriodActive = !specialDayToday || !specialDayToday.periods || specialDayToday.periods.length === 0
+    || (activeCell ? specialDayToday.periods.includes(activeCell.timeSlot) : true)
+
+  if (specialDayToday && isSpecialDayPeriodActive && specialDayToday.type === "holiday") {
     return (
       <Card className="overflow-hidden border-2 border-slate-500/20 bg-gradient-to-br from-card to-slate-500/5 shadow-lg h-full flex flex-col justify-center min-h-[220px]">
         <CardContent className="flex flex-col items-center justify-center p-8 text-center">
@@ -183,7 +210,7 @@ export function CurrentClassCard() {
     )
   }
 
-  if (specialDayToday && specialDayToday.type === "event") {
+  if (specialDayToday && isSpecialDayPeriodActive && specialDayToday.type === "event") {
     return (
       <Card className="overflow-hidden border-2 border-purple-500/20 bg-gradient-to-br from-card to-purple-500/5 shadow-lg h-full flex flex-col justify-center min-h-[220px]">
         <CardContent className="flex flex-col items-center justify-center p-8 text-center">
@@ -203,7 +230,7 @@ export function CurrentClassCard() {
     )
   }
 
-  if (specialDayToday && specialDayToday.type === "examination") {
+  if (specialDayToday && isSpecialDayPeriodActive && specialDayToday.type === "examination") {
     return (
       <Card className="overflow-hidden border-2 border-blue-500/20 bg-gradient-to-br from-card to-blue-500/5 shadow-lg h-full flex flex-col justify-center min-h-[220px]">
         <CardContent className="flex flex-col items-center justify-center p-8 text-center">

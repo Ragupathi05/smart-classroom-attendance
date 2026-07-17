@@ -57,3 +57,36 @@ export function getLocalDateStringForDay(dayName: string): string {
   
   return targetDate.toISOString().split("T")[0]
 }
+
+export function isSlotInFuture(slot: string, dateStr?: string): boolean {
+  if (dateStr) {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const targetDate = new Date(dateStr)
+    targetDate.setHours(0, 0, 0, 0)
+    if (targetDate.getTime() > today.getTime()) {
+      return true
+    }
+    if (targetDate.getTime() < today.getTime()) {
+      return false
+    }
+  }
+
+  const match = slot.match(/^(\d{1,2}):(\d{2})/)
+  if (!match) return false
+
+  let hours = parseInt(match[1])
+  const minutes = parseInt(match[2])
+
+  if (hours < 9) {
+    hours += 12
+  }
+
+  const slotStartTime = new Date()
+  slotStartTime.setHours(hours, minutes, 0, 0)
+
+  // Class opens exactly 1 hour (60 minutes) before the slot starts
+  const allowedStartTime = slotStartTime.getTime() - 60 * 60 * 1000
+
+  return Date.now() < allowedStartTime
+}

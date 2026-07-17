@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
+import * as XLSX from "xlsx"
 import { Upload, UserRoundPlus, Pencil, Trash2, Hand } from "lucide-react"
 import { toast } from "react-toastify"
-import { useStudentStore, useAttendanceStore } from "@/store"
+import { useStudentStore, useAttendanceStore, useAcademicStore, useAuthStore, useConfirmStore } from "@/store"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -27,12 +28,36 @@ export function StudentManagerPage() {
     importClassStudents,
   } = useStudentStore()
   const { attendanceRecords } = useAttendanceStore()
+  const { user } = useAuthStore()
+  const {
+    selectedSectionWorkspace,
+    sections,
+    getSectionStudentsWithStatus,
+    transferStudent,
+    toggleStudentActive,
+  } = useAcademicStore()
+  const confirm = useConfirmStore((state) => state.confirm)
+
+  const isCRLR = user?.role === "cr" || user?.role === "lr"
+
+  const [selectedSectionFilter, setSelectedSectionFilter] = useState(() => {
+    return isCRLR ? (user?.sectionId || "sec-1") : (selectedSectionWorkspace || "sec-1")
+  })
+
+  const displayStudents = useMemo(() => {
+    return getSectionStudentsWithStatus(selectedSectionFilter)
+  }, [selectedSectionFilter, classStudents, getSectionStudentsWithStatus])
 
   const [actionStudentId, setActionStudentId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ rollNumber: "", name: "" })
   const [formError, setFormError] = useState("")
+
+  // Transfer Modal state variables
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
+  const [transferringStudent, setTransferringStudent] = useState<any | null>(null)
+  const [targetTransferSectionId, setTargetTransferSectionId] = useState("")
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const longPressTimer = useRef<number | null>(null)
@@ -89,13 +114,17 @@ export function StudentManagerPage() {
     }
 
     const result = editingId
-      ? updateClassStudent(editingId, { rollNumber, name })
-      : addClassStudent({ rollNumber, name })
+      ? updateClassStudent(editingId, { rollNumber, name, gender: "Male" })
+      : addClassStudent({ rollNumber, name, gender: "Male" })
 
     if (!result.success) {
       setFormError(result.message)
       toast.error(result.message)
       return
+    }
+
+    if (!editingId && result.studentId) {
+      useAcademicStore.getState().addEnrollment(result.studentId, selectedSectionFilter)
     }
 
     toast.success(result.message)
@@ -106,61 +135,125 @@ export function StudentManagerPage() {
     const student = classStudents.find((item) => item.id === studentId)
     if (!student) return
 
-    const confirmed = window.confirm(
-      `Delete ${student.name} (${student.rollNumber}) from class list?`
-    )
-
-    if (!confirmed) return
-
-    deleteClassStudent(student.id)
-    setActionStudentId(null)
-    toast.success("Student deleted successfully.")
+    confirm({
+      title: "Delete Student Profile",
+      message: `Are you sure you want to delete ${student.name} (${student.rollNumber}) from the class list? This cannot be undone.`,
+      confirmText: "Delete",
+      onConfirm: () => {
+        deleteClassStudent(student.id)
+        setActionStudentId(null)
+        toast.success("Student deleted successfully.")
+      }
+    })
   }
 
   const handleImportClick = () => {
     fileInputRef.current?.click()
   }
 
-  const parseCsvRows = (content: string): Array<{ rollNumber: string; name: string }> => {
-    return content
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const [rollNumber = "", ...nameParts] = line.split(",")
-        return {
-          rollNumber: rollNumber.trim(),
-          name: nameParts.join(",").trim(),
+  const parseExcelFile = async (file: File): Promise<Array<{ rollNumber: string; name: string; gender?: "Male" | "Female"; mobileNumber?: string }>> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer)
+          const workbook = XLSX.read(data, { type: "array" })
+          
+          const firstSheetName = workbook.SheetNames[0]
+          if (!firstSheetName) {
+            resolve([])
+            return
+          }
+          
+          const sheet = workbook.Sheets[firstSheetName]
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][]
+          if (rows.length === 0) {
+            resolve([])
+            return
+          }
+
+          let headerIdx = 0
+          for (let i = 0; i < Math.min(rows.length, 5); i++) {
+            const rowStr = rows[i].map(c => String(c || "").toLowerCase()).join(" ")
+            if (rowStr.includes("roll") || rowStr.includes("name") || rowStr.includes("student")) {
+              headerIdx = i
+              break
+            }
+          }
+
+          const headers = rows[headerIdx].map(h => String(h || "").trim().toLowerCase())
+
+          const rollIdx = headers.findIndex(h => h.includes("roll"))
+          const nameIdx = headers.findIndex(h => h.includes("name") || h.includes("student"))
+          const genderIdx = headers.findIndex(h => h.includes("gender"))
+          const mobileIdx = headers.findIndex(h => h.includes("mobile") || h.includes("phone") || h.includes("contact"))
+
+          const result: Array<{ rollNumber: string; name: string; gender?: "Male" | "Female"; mobileNumber?: string }> = []
+
+          for (let i = headerIdx + 1; i < rows.length; i++) {
+            const parts = rows[i]
+            if (!parts || parts.length === 0) continue
+
+            const rollNumber = rollIdx !== -1 ? String(parts[rollIdx] || "").trim() : String(parts[0] || "").trim()
+            const name = nameIdx !== -1 ? String(parts[nameIdx] || "").trim() : String(parts[1] || "").trim()
+            const genderRaw = genderIdx !== -1 ? String(parts[genderIdx] || "").trim() : ""
+            const mobileNumber = mobileIdx !== -1 ? String(parts[mobileIdx] || "").trim() : ""
+
+            const gender = (genderRaw.toLowerCase().startsWith("f") || genderRaw.toLowerCase() === "female") 
+              ? "Female" 
+              : "Male"
+
+            if (rollNumber && name) {
+              result.push({
+                rollNumber,
+                name,
+                gender,
+                mobileNumber
+              })
+            }
+          }
+
+          resolve(result)
+        } catch (err) {
+          reject(err)
         }
-      })
-      .filter((row) => {
-        const roll = row.rollNumber.toLowerCase()
-        const name = row.name.toLowerCase()
-        const isHeader =
-          (roll === "roll_no" || roll === "rollnumber" || roll === "roll_number") &&
-          (name === "name" || name === "student_name")
-        return !isHeader
-      })
+      }
+      reader.onerror = (err) => reject(err)
+      reader.readAsArrayBuffer(file)
+    })
   }
 
-  const handleCsvUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleExcelUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ""
 
     if (!file) return
 
     try {
-      const content = await file.text()
-      const parsedRows = parseCsvRows(content)
+      const parsedRows = await parseExcelFile(file)
       if (parsedRows.length === 0) {
-        toast.error("CSV has no valid rows. Use format: roll_no,name")
+        toast.error("Excel sheet has no valid rows or header mismatch. Column mapping requires Roll Number and Student Name.")
         return
       }
 
-      const { added, skipped } = importClassStudents(parsedRows)
-      toast.success(`Import completed: ${added} added, ${skipped} skipped.`)
-    } catch {
-      toast.error("Unable to read CSV file.")
+      const academicState = useAcademicStore.getState()
+      
+      // Override/Clear existing enrollments for this section in the current session
+      academicState.clearSectionEnrollments(selectedSectionFilter)
+
+      // Import student records globally (adds new or overrides details)
+      const { added, skipped, addedStudentIds } = importClassStudents(parsedRows)
+      
+      // Enroll all imported students in this section
+      if (addedStudentIds && addedStudentIds.length > 0) {
+        addedStudentIds.forEach(id => {
+          academicState.addEnrollment(id, selectedSectionFilter)
+        })
+      }
+      toast.success(`Excel Import Complete: Section roster overridden with ${addedStudentIds.length} students.`)
+    } catch (err) {
+      console.error(err)
+      toast.error("Unable to read Excel file. Please upload a valid .xlsx or .xls file.")
     }
   }
 
@@ -207,9 +300,25 @@ export function StudentManagerPage() {
       <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-lg font-semibold text-foreground">Students</CardTitle>
-              <CardDescription className="text-muted-foreground">Manage class student details and imports</CardDescription>
+            <div className="flex items-center gap-3">
+              <div>
+                <CardTitle className="text-lg font-semibold text-foreground">Students</CardTitle>
+                <CardDescription className="text-muted-foreground">Manage class student details and imports</CardDescription>
+              </div>
+              {!isCRLR && (
+                <div className="flex items-center gap-1.5 ml-4">
+                  <span className="text-xs text-muted-foreground font-bold">Section:</span>
+                  <select
+                    value={selectedSectionFilter}
+                    onChange={(e) => setSelectedSectionFilter(e.target.value)}
+                    className="bg-background border border-border text-xs font-bold rounded-xl h-8 px-3 focus:outline-none"
+                  >
+                    {sections.map((sec) => (
+                      <option key={sec.id} value={sec.id}>{sec.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -222,23 +331,47 @@ export function StudentManagerPage() {
               </Button>
               <Button type="button" variant="outline" onClick={handleImportClick}>
                 <Upload className="mr-2 h-4 w-4" />
-                Import CSV
+                Import Excel
               </Button>
+              {!isCRLR && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="text-amber-600 border-amber-600/35 hover:bg-amber-600 hover:text-white"
+                  onClick={() => {
+                    const secName = sections.find(s => s.id === selectedSectionFilter)?.name || "ROSTER"
+                    toast.success(`Default passwords reset for all ${displayStudents.length} students in section: MITS@${secName.replace(/\s+/g, "")}`)
+                  }}
+                >
+                  Bulk Reset Pwd
+                </Button>
+              )}
             </div>
           </div>
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,text/csv"
+            accept=".xlsx,.xls"
             className="hidden"
-            onChange={handleCsvUpload}
+            onChange={handleExcelUpload}
           />
         </CardHeader>
 
         <CardContent>
-          <div className="mb-3 flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-            <Hand className="h-3.5 w-3.5" />
-            <span>Long press a row to show Edit and Delete</span>
+          <div className="mb-3 flex flex-col gap-1.5 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Hand className="h-3.5 w-3.5" />
+              <span>Long press a row to show Edit and Delete</span>
+            </div>
+            <div className="flex items-start gap-2 border-t border-border/40 pt-2 mt-0.5 leading-relaxed font-semibold">
+              <Upload className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <strong>Excel Import Guidelines:</strong> Supported formats: <code>.xlsx</code> or <code>.xls</code> (Spreadsheets). 
+                The sheet MUST contain columns: <code>Roll Number</code> (or Roll No) and <code>Student Name</code>. 
+                Optionally includes: <code>Gender</code> and <code>Mobile Number</code> columns. 
+                Importing will completely replace/overwrite this section's roster.
+              </div>
+            </div>
           </div>
           <div ref={tableWrapperRef} className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-sm">
@@ -246,13 +379,14 @@ export function StudentManagerPage() {
                 <tr className="border-b border-border bg-muted/40 text-left text-muted-foreground">
                   <th className="px-3 py-2 font-medium">Roll Number</th>
                   <th className="px-3 py-2 font-medium">Student Name</th>
+                  <th className="px-3 py-2 text-center font-medium">Status</th>
                   <th className="px-3 py-2 text-center font-medium">Conducted</th>
                   <th className="px-3 py-2 text-center font-medium">Attended</th>
                   <th className="px-3 py-2 text-center font-medium">Attendance %</th>
                 </tr>
               </thead>
               <tbody>
-                {classStudents.map((student) => {
+                {displayStudents.map((student) => {
                   const showActions = actionStudentId === student.id
                   const stats = attendanceStatsByStudent.get(student.id) || { total: 0, attended: 0 }
                   const attendancePercent = stats.total > 0
@@ -263,7 +397,7 @@ export function StudentManagerPage() {
                       ? "text-green-600"
                       : attendancePercent >= 75
                       ? "text-amber-600"
-                      : "text-red-600"
+                      : "text-red-650"
 
                   return (
                     <tr
@@ -296,6 +430,43 @@ export function StudentManagerPage() {
                                 <Pencil className="mr-1 h-3.5 w-3.5" />
                                 Edit
                               </Button>
+                              {!isCRLR && (
+                                <>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className={student.enrollmentStatus === "Active" ? "text-amber-600 border-amber-600/35 hover:bg-amber-500/10" : "text-emerald-650 border-emerald-600/35 hover:bg-emerald-500/10"}
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      const active = student.enrollmentStatus !== "Active"
+                                      toggleStudentActive(student.id, selectedSectionFilter, active)
+                                      toast.info(`Student set to ${active ? "active" : "inactive"} successfully!`)
+                                      setActionStudentId(null)
+                                    }}
+                                  >
+                                    {student.enrollmentStatus === "Active" ? "Deactivate" : "Activate"}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-indigo-600 border-indigo-600/35 hover:bg-indigo-500/10"
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      setTransferringStudent(student)
+                                      const otherSecs = sections.filter(s => s.id !== selectedSectionFilter)
+                                      if (otherSecs.length > 0) {
+                                        setTargetTransferSectionId(otherSecs[0].id)
+                                      }
+                                      setIsTransferModalOpen(true)
+                                      setActionStudentId(null)
+                                    }}
+                                  >
+                                    Transfer
+                                  </Button>
+                                </>
+                              )}
                               <Button
                                 type="button"
                                 size="sm"
@@ -313,6 +484,14 @@ export function StudentManagerPage() {
                           ) : null}
                         </div>
                       </td>
+                      <td className="px-3 py-2 text-center font-semibold">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-full text-[10px] font-bold text-white",
+                          student.enrollmentStatus === "Active" ? "bg-emerald-600" : "bg-rose-600"
+                        )}>
+                          {student.enrollmentStatus}
+                        </span>
+                      </td>
                       <td className="px-3 py-2 text-center font-medium text-foreground">{stats.total}</td>
                       <td className="px-3 py-2 text-center font-medium text-foreground">{stats.attended}</td>
                       <td className={cn("px-3 py-2 text-center font-semibold", percentageColorClass)}>
@@ -325,7 +504,7 @@ export function StudentManagerPage() {
             </table>
           </div>
 
-          {classStudents.length === 0 ? (
+          {displayStudents.length === 0 ? (
             <p className="mt-4 rounded-md border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
               No students found. Add students manually or import CSV.
             </p>
@@ -387,6 +566,61 @@ export function StudentManagerPage() {
             </Button>
             <Button type="button" onClick={handleSave}>
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transfer Section Dialog */}
+      <Dialog open={isTransferModalOpen} onOpenChange={setIsTransferModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transfer Student</DialogTitle>
+            <DialogDescription>
+              Move <strong>{transferringStudent?.name}</strong> to a different section workspace.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 text-xs font-bold">
+            <div>
+              <label className="block text-muted-foreground uppercase tracking-widest text-[9px] mb-1.5 font-black">Target Section</label>
+              <select
+                value={targetTransferSectionId}
+                onChange={(e) => setTargetTransferSectionId(e.target.value)}
+                className="bg-input/40 border border-border text-xs font-semibold rounded-lg h-9 w-full px-3 focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                {sections.filter(s => s.id !== selectedSectionFilter).map((sec) => (
+                  <option key={sec.id} value={sec.id}>
+                    {sec.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsTransferModalOpen(false)
+                setTransferringStudent(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (transferringStudent && targetTransferSectionId) {
+                  transferStudent(transferringStudent.id, selectedSectionFilter, targetTransferSectionId)
+                  toast.success(`${transferringStudent.name} transferred to ${sections.find(s => s.id === targetTransferSectionId)?.name || "new section"} successfully!`)
+                  setIsTransferModalOpen(false)
+                  setTransferringStudent(null)
+                }
+              }}
+            >
+              Confirm Transfer
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -11,4 +11,5 @@ export interface User {
   section?: string
   phone?: string
   mentor?: string
+  sectionId?: string
 }

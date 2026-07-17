@@ -5,4 +5,6 @@ export interface Student {
   rollNumber: string
   name: string
   status: AttendanceStatus
+  gender?: "Male" | "Female"
+  mobileNumber?: string
 }

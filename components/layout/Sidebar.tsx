@@ -1,31 +1,27 @@
 "use client"
 
+import { useState } from "react"
 import {
   LayoutDashboard,
-  ClipboardCheck,
-  History,
-  FileEdit,
-  BarChart3,
-  Settings,
-  CalendarDays,
-  Users,
-  LogOut,
   GraduationCap,
+  Users,
+  CalendarDays,
+  ClipboardCheck,
+  BarChart3,
+  Bell,
+  Settings,
+  History,
+  User,
+  FileEdit,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
   X,
+  Calendar,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthStore, useSharedStore } from "@/store"
 import { Button } from "@/components/ui/button"
-
-const navigation = [
-  { name: "Dashboard", icon: LayoutDashboard, page: "dashboard" },
-  { name: "Corrections", icon: FileEdit, page: "corrections" },
-  { name: "Analytics", icon: BarChart3, page: "analytics" },
-  { name: "History", icon: History, page: "history" },
-  { name: "Student Manager", icon: Users, page: "student-manager" },
-  { name: "Timetable Editor", icon: CalendarDays, page: "timetable-editor" },
-  { name: "Settings", icon: Settings, page: "settings" },
-]
 
 interface SidebarProps {
   isOpen: boolean
@@ -34,12 +30,51 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { logout, user } = useAuthStore()
-  const { currentPage, setCurrentPage } = useSharedStore()
+  const { currentPage, setCurrentPage, sidebarCollapsed: isCollapsed, setSidebarCollapsed: setIsCollapsed } = useSharedStore()
 
   const handleNavClick = (page: string) => {
     setCurrentPage(page)
     onClose()
   }
+
+  const getNavigation = () => {
+    switch (user?.role) {
+      case "hod":
+        return [
+          { name: "Dashboard", icon: LayoutDashboard, page: "dashboard" },
+          { name: "Academic", icon: GraduationCap, page: "academic" },
+          { name: "People", icon: Users, page: "people" },
+          { name: "Timetable", icon: CalendarDays, page: "timetable-editor" },
+          { name: "Calendar", icon: Calendar, page: "calendar" },
+          { name: "Attendance", icon: ClipboardCheck, page: "attendance-monitoring" },
+          { name: "Analytics", icon: BarChart3, page: "analytics" },
+          { name: "Notifications", icon: Bell, page: "notifications" },
+          { name: "Settings", icon: Settings, page: "settings" },
+        ]
+      case "faculty":
+        return [
+          { name: "Dashboard", icon: LayoutDashboard, page: "dashboard" },
+          { name: "My Timetable", icon: CalendarDays, page: "my-timetable" },
+          { name: "Attendance", icon: ClipboardCheck, page: "mark-attendance" },
+          { name: "History", icon: History, page: "history" },
+          { name: "Analytics", icon: BarChart3, page: "analytics" },
+          { name: "Profile", icon: User, page: "profile" },
+        ]
+      case "cr":
+      case "lr":
+      default:
+        return [
+          { name: "Dashboard", icon: LayoutDashboard, page: "dashboard" },
+          { name: "History", icon: History, page: "history" },
+          { name: "Analytics", icon: BarChart3, page: "analytics" },
+          { name: "Notifications", icon: Bell, page: "notifications" },
+          { name: "Profile", icon: User, page: "profile" },
+          { name: "Weekly Timetable", icon: CalendarDays, page: "weekly-timetable" },
+        ]
+    }
+  }
+
+  const navigation = getNavigation()
 
   return (
     <>
@@ -54,67 +89,72 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r border-border/50 bg-sidebar transition-transform duration-300 ease-out lg:translate-x-0",
-          isOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-border bg-sidebar transition-all duration-300 ease-out lg:translate-x-0",
+          isOpen ? "translate-x-0 w-[280px]" : "-translate-x-full lg:translate-x-0",
+          isCollapsed ? "w-[72px]" : "w-[280px]"
         )}
       >
-        {/* Logo */}
+        {/* Logo Section */}
         <div className="flex h-16 items-center justify-between border-b border-border/50 px-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-md shadow-primary/20">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary shadow-md shadow-primary/20">
               <GraduationCap className="h-5 w-5 text-primary-foreground" />
             </div>
-            <div>
-              <h1 className="text-sm font-bold tracking-tight text-sidebar-foreground">AttendEase</h1>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Attendance System</p>
-            </div>
+            {!isCollapsed && (
+              <div className="animate-fade-in-up">
+                <h1 className="text-sm font-bold tracking-tight text-sidebar-foreground">AttendEase</h1>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">MITS Dashboard</p>
+              </div>
+            )}
           </div>
+          
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden hover:bg-sidebar-accent"
+            className="lg:hidden hover:bg-sidebar-accent text-sidebar-foreground"
             onClick={onClose}
           >
             <X className="h-5 w-5" />
           </Button>
+
+          {/* Collapse toggle (desktop only) */}
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="hidden lg:flex absolute -right-3 top-5 h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm hover:text-foreground transition-all duration-200"
+          >
+            {isCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+          </button>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Menu
-          </p>
+          {!isCollapsed && (
+            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground animate-fade-in-up">
+              Workspace
+            </p>
+          )}
           {navigation.map((item, index) => {
             const isActive = currentPage === item.page
             const Icon = item.icon
-            
-            // Hide mark attendance for faculty
-            if (item.page === "mark-attendance" && user?.role === "faculty") {
-              return null
-            }
 
-            if (item.page === "student-manager" && user?.role === "faculty") {
-              return null
-            }
-            
             return (
               <button
                 key={item.name}
                 onClick={() => handleNavClick(item.page)}
                 className={cn(
-                  "group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                  "group flex w-full items-center gap-4 rounded-xl px-3.5 py-3 text-sm font-bold transition-all duration-150",
                   isActive
-                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/10"
                     : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 )}
-                style={{ animationDelay: `${index * 50}ms` }}
+                title={isCollapsed ? item.name : undefined}
               >
                 <Icon className={cn(
-                  "h-5 w-5 shrink-0 transition-transform duration-200",
+                  "h-5 w-5 shrink-0 transition-transform duration-250",
                   !isActive && "group-hover:scale-110"
                 )} />
-                <span className="truncate">{item.name}</span>
-                {isActive && (
+                {!isCollapsed && <span className="truncate">{item.name}</span>}
+                {isActive && !isCollapsed && (
                   <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary-foreground" />
                 )}
               </button>
@@ -122,30 +162,46 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           })}
         </nav>
 
-        {/* User Info & Logout */}
-        <div className="border-t border-border/50 p-3">
-          <div className="mb-3 rounded-xl bg-gradient-to-br from-sidebar-accent to-sidebar-accent/50 p-3">
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <span className="text-sm font-bold">
-                  {user?.name?.charAt(0).toUpperCase() || "U"}
-                </span>
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-sidebar-foreground">{user?.name}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {user?.role === "cr" ? "Class Representative" : user?.role === "lr" ? "Ladies Representative" : "Faculty"}
-                </p>
-              </div>
-            </div>
-          </div>
+        {/* Bottom Profile, Settings & Logout Section */}
+        <div className="border-t border-border/50 p-3 space-y-1">
+          {/* Settings button */}
+          <button
+            onClick={() => handleNavClick("settings")}
+            className={cn(
+              "flex w-full items-center gap-4 rounded-xl px-3.5 py-2.5 text-sm font-bold text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-150",
+              currentPage === "settings" && "bg-sidebar-accent text-sidebar-foreground"
+            )}
+            title={isCollapsed ? "Settings" : undefined}
+          >
+            <Settings className="h-5 w-5 shrink-0" />
+            {!isCollapsed && <span>Settings</span>}
+          </button>
+
+          {/* Profile button */}
+          <button
+            onClick={() => handleNavClick("profile")}
+            className={cn(
+              "flex w-full items-center gap-4 rounded-xl px-3.5 py-2.5 text-sm font-bold text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-150",
+              currentPage === "profile" && "bg-sidebar-accent text-sidebar-foreground"
+            )}
+            title={isCollapsed ? "Profile" : undefined}
+          >
+            <User className="h-5 w-5 shrink-0" />
+            {!isCollapsed && <span>Profile</span>}
+          </button>
+
+          {/* Logout */}
           <Button
             variant="ghost"
-            className="w-full justify-start gap-3 rounded-lg text-muted-foreground transition-all duration-200 hover:bg-destructive/10 hover:text-destructive"
             onClick={logout}
+            className={cn(
+              "w-full justify-start gap-4 rounded-xl text-muted-foreground transition-all duration-150 hover:bg-destructive/10 hover:text-destructive font-bold px-3.5 py-2.5",
+              isCollapsed && "justify-center"
+            )}
+            title={isCollapsed ? "Sign Out" : undefined}
           >
-            <LogOut className="h-4 w-4" />
-            Sign Out
+            <LogOut className="h-5 w-5 shrink-0" />
+            {!isCollapsed && <span>Sign Out</span>}
           </Button>
         </div>
       </aside>

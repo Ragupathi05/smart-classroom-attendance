@@ -7,3 +7,6 @@ export * from "./sharedStore"
 export * from "./profileStore"
 export * from "./analyticsStore"
 export * from "./sessionStore"
+export * from "./academicStore"
+export * from "./confirmStore"
+

@@ -1,1 +1,1 @@
-export type UserRole = "cr" | "lr" | "faculty"
+export type UserRole = "cr" | "lr" | "faculty" | "hod"

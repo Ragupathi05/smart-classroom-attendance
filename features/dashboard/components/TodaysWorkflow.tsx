@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
-import { useTimetableStore, useAttendanceStore, useSharedStore, useAuthStore, useSessionStore } from "@/store"
+import { useTimetableStore, useAttendanceStore, useSharedStore, useAuthStore, useSessionStore, useAcademicStore } from "@/store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -27,7 +27,8 @@ const slotEndToMinutes = (slot: string): number => {
 }
 
 export function TodaysWorkflow() {
-  const { timetable, setSelectedCell, specialDays } = useTimetableStore()
+  const { timetable, setSelectedCell, specialDays, currentSectionFilter } = useTimetableStore()
+  const { sections } = useAcademicStore()
   const { attendanceRecords } = useAttendanceStore()
   const { setCurrentPage } = useSharedStore()
   const { user } = useAuthStore()
@@ -48,8 +49,26 @@ export function TodaysWorkflow() {
   }, [now])
 
   const specialDayToday = useMemo(() => {
-    return specialDays?.[todayDateStr] || null
-  }, [specialDays, todayDateStr])
+    const specialDay = specialDays?.[todayDateStr]
+    if (!specialDay) return null
+    
+    let isSpecialDayActive = false
+    const activeSection = sections.find(s => s.id === currentSectionFilter)
+
+    if (!specialDay.scopeType || specialDay.scopeType === "all") {
+      isSpecialDayActive = true
+    } else if (specialDay.scopeType === "batch") {
+      if (activeSection && specialDay.scopeTargetIds?.includes(activeSection.batchId)) {
+        isSpecialDayActive = true
+      }
+    } else if (specialDay.scopeType === "section") {
+      if (specialDay.scopeTargetIds?.includes(currentSectionFilter)) {
+        isSpecialDayActive = true
+      }
+    }
+
+    return isSpecialDayActive ? specialDay : null
+  }, [specialDays, todayDateStr, currentSectionFilter, sections])
 
   const submittedCellIds = useMemo(() => {
     return new Set(attendanceRecords.flatMap((record) => record.cellIds || []))
@@ -108,7 +127,24 @@ export function TodaysWorkflow() {
         status = "extra-class"
       } else {
         const specialDay = specialDays?.[cellDateStr]
+        let isSpecialDayActive = false
+        const activeSection = sections.find(s => s.id === currentSectionFilter)
+
         if (specialDay) {
+          if (!specialDay.scopeType || specialDay.scopeType === "all") {
+            isSpecialDayActive = true
+          } else if (specialDay.scopeType === "batch") {
+            if (activeSection && specialDay.scopeTargetIds?.includes(activeSection.batchId)) {
+              isSpecialDayActive = true
+            }
+          } else if (specialDay.scopeType === "section") {
+            if (specialDay.scopeTargetIds?.includes(currentSectionFilter)) {
+              isSpecialDayActive = true
+            }
+          }
+        }
+
+        if (isSpecialDayActive && specialDay) {
           if (specialDay.type === "holiday") status = "holiday"
           else if (specialDay.type === "examination") status = "exam"
           else if (specialDay.type === "event") status = "seminar"

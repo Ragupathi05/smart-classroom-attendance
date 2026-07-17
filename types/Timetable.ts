@@ -18,10 +18,17 @@ export interface TimetableCell {
   timeSlot: string
   status: "current" | "submitted" | "missed" | "upcoming"
   type?: TimetableCellClassType
+  sectionId?: string
+  academicSessionId?: string
+  isPublished?: boolean
+  sectionName?: string
 }
 
 export interface SpecialDay {
   date: string // YYYY-MM-DD
   type: "working" | "holiday" | "event" | "examination"
   reason?: string
+  scopeType?: "all" | "batch" | "section" | "custom"
+  scopeTargetIds?: string[]
+  periods?: string[]
 }

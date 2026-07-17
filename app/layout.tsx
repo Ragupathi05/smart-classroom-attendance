@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
-import Script from 'next/script'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
@@ -39,33 +38,36 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                var strip = function(el) {
+                  if (el && el.removeAttribute) {
+                    el.removeAttribute('bis_skin_checked');
+                  }
+                };
+                var observer = new MutationObserver(function(mutations) {
+                  mutations.forEach(function(mutation) {
+                    if (mutation.attributeName === 'bis_skin_checked') {
+                      strip(mutation.target);
+                    }
+                  });
+                });
+                observer.observe(document.documentElement, {
+                  attributes: true,
+                  subtree: true,
+                  attributeFilter: ['bis_skin_checked']
+                });
+                // Initial scan
+                document.querySelectorAll('[bis_skin_checked]').forEach(strip);
+              })();
+            `
+          }}
+        />
+      </head>
       <body className="font-sans antialiased" suppressHydrationWarning>
-        <Script id="strip-bis-attr" strategy="beforeInteractive">
-          {`(() => {
-  const stripBisAttr = () => {
-    document.querySelectorAll('[bis_skin_checked]').forEach((element) => {
-      element.removeAttribute('bis_skin_checked');
-    });
-  };
-
-  stripBisAttr();
-
-  const observer = new MutationObserver(() => {
-    stripBisAttr();
-  });
-
-  observer.observe(document.documentElement, {
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['bis_skin_checked'],
-  });
-
-  window.addEventListener('load', () => {
-    stripBisAttr();
-    observer.disconnect();
-  }, { once: true });
-})();`}
-        </Script>
         {children}
         <Analytics />
       </body>

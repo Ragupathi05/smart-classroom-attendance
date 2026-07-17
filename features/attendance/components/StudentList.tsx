@@ -72,13 +72,18 @@ export function StudentList({ readOnly = false }: StudentListProps) {
         </button>
       </div>
 
-      <ScrollArea className="h-[400px] rounded-lg border border-border">
-        <div className="divide-y divide-border">
+      <div className="overflow-x-auto max-h-[400px] overflow-y-auto rounded-lg border border-border scrollbar-thin">
+        <div className="divide-y divide-border min-w-[480px] md:min-w-full">
           {/* Header */}
-          <div className="sticky top-0 z-10 grid grid-cols-12 gap-4 bg-muted px-4 py-3">
-            <div className="col-span-2 text-sm font-medium text-muted-foreground">Roll No.</div>
-            <div className="col-span-4 text-sm font-medium text-muted-foreground">Student Name</div>
-            <div className="col-span-6 text-sm font-medium text-muted-foreground">Attendance Status</div>
+          <div className="sticky top-0 z-10 grid grid-cols-12 gap-2 bg-muted px-4 py-3 items-center">
+            <div className="col-span-3 md:col-span-2 text-xs md:text-sm font-semibold text-muted-foreground">Roll No.</div>
+            <div className="col-span-5 md:col-span-4 text-xs md:text-sm font-semibold text-muted-foreground">Student Name</div>
+            <div className="col-span-4 md:col-span-6 flex justify-end md:justify-start gap-4 md:gap-0 text-xs md:text-sm font-semibold text-muted-foreground">
+              <span className="md:hidden text-green-600 font-extrabold w-6 text-center">P</span>
+              <span className="md:hidden text-yellow-600 font-extrabold w-6 text-center">PR</span>
+              <span className="md:hidden text-red-500 font-extrabold w-6 text-center">A</span>
+              <span className="hidden md:inline">Attendance Status</span>
+            </div>
           </div>
 
           {/* Student Rows */}
@@ -86,39 +91,44 @@ export function StudentList({ readOnly = false }: StudentListProps) {
             <div
               key={student.id}
               className={cn(
-                "grid grid-cols-12 items-center gap-4 px-4 py-3 transition duration-200 hover:bg-gray-50",
+                "grid grid-cols-12 gap-2 items-center px-4 py-2.5 transition duration-200 hover:bg-gray-50",
                 index % 2 === 0 ? "bg-card" : "bg-muted/30"
               )}
             >
-              <div className="col-span-2">
-                <span className="font-mono text-sm text-foreground">{student.rollNumber}</span>
+              {/* Roll Number */}
+              <div className="col-span-3 md:col-span-2 font-mono text-xs md:text-sm text-foreground truncate">
+                {student.rollNumber}
               </div>
-              <div className="col-span-4">
-                <span className="text-sm font-medium text-foreground">{student.name}</span>
+
+              {/* Student Name */}
+              <div className="col-span-5 md:col-span-4 text-xs md:text-sm font-bold text-foreground truncate pr-1">
+                {student.name}
               </div>
-              <div className="col-span-6">
+
+              {/* Radio Group */}
+              <div className="col-span-4 md:col-span-6">
                 <RadioGroup
                   value={student.status}
                   onValueChange={(value) => updateStudentStatus(student.id, value as AttendanceStatus)}
-                  className="flex gap-6"
+                  className="flex justify-end md:justify-start gap-4 md:gap-6"
                   disabled={readOnly}
                 >
                   {statusOptions.map((option) => (
-                    <div key={option.value} className="flex items-center gap-2">
+                    <div key={option.value} className="flex items-center gap-1.5">
                       <RadioGroupItem
                         value={option.value}
                         id={`${student.id}-${option.value}`}
                         className={cn(
-                          "border-muted-foreground",
-                          student.status === option.value && option.value === "present" && "border-green-600 text-green-600",
-                          student.status === option.value && option.value === "permission" && "border-warning text-warning",
-                          student.status === option.value && option.value === "absent" && "border-destructive text-destructive"
+                          "h-5 w-5 border-muted-foreground cursor-pointer shrink-0",
+                          student.status === option.value && option.value === "present" && "border-green-600 text-green-600 bg-green-50 dark:bg-green-950/20",
+                          student.status === option.value && option.value === "permission" && "border-warning text-warning bg-yellow-50 dark:bg-yellow-950/20",
+                          student.status === option.value && option.value === "absent" && "border-destructive text-destructive bg-rose-50 dark:bg-rose-955/20"
                         )}
                       />
                       <Label
                         htmlFor={`${student.id}-${option.value}`}
                         className={cn(
-                          "cursor-pointer text-sm",
+                          "hidden md:inline cursor-pointer text-sm font-semibold select-none",
                           readOnly && "cursor-not-allowed opacity-80",
                           student.status === option.value ? option.color : "text-muted-foreground"
                         )}
@@ -138,7 +148,7 @@ export function StudentList({ readOnly = false }: StudentListProps) {
             </div>
           ) : null}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }

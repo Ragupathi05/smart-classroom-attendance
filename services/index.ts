@@ -4,3 +4,7 @@ export * from "./StudentService"
 export * from "./TimetableService"
 export * from "./SettingsService"
 export * from "./CorrectionService"
+export * from "./DashboardService"
+export * from "./AnalyticsService"
+export * from "./SupabaseService"
+

@@ -12,6 +12,7 @@ import { toast } from "react-toastify"
 
 export function ProfilePage() {
   const { user, updateUserProfile } = useProfileStore()
+  const isCRLR = user?.role === "cr" || user?.role === "lr"
   
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -104,6 +105,7 @@ export function ProfilePage() {
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
+                placeholder="e.g. name@mits.ac.in"
               />
             </div>
 

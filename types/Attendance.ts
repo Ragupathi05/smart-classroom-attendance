@@ -16,4 +16,6 @@ export interface AttendanceRecord {
   isEdited?: boolean
   submittedAt?: string
   submittedBy?: string
+  sectionId?: string
+  academicSessionId?: string
 }

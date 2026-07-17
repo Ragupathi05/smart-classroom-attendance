@@ -5,10 +5,10 @@ import { StudentService } from "@/services"
 
 interface StudentState {
   classStudents: Student[]
-  addClassStudent: (entry: { rollNumber: string; name: string }) => { success: boolean; message: string }
-  updateClassStudent: (id: string, entry: { rollNumber: string; name: string }) => { success: boolean; message: string }
+  addClassStudent: (entry: { rollNumber: string; name: string; gender: "Male" | "Female"; mobileNumber?: string }) => { success: boolean; message: string; studentId?: string }
+  updateClassStudent: (id: string, entry: { rollNumber: string; name: string; gender?: "Male" | "Female"; mobileNumber?: string }) => { success: boolean; message: string }
   deleteClassStudent: (id: string) => void
-  importClassStudents: (entries: Array<{ rollNumber: string; name: string }>) => { added: number; skipped: number }
+  importClassStudents: (entries: Array<{ rollNumber: string; name: string; gender?: "Male" | "Female"; mobileNumber?: string }>) => { added: number; skipped: number; addedStudentIds: string[] }
 }
 
 const getLegacyStudentState = () => {
@@ -36,7 +36,7 @@ export const useStudentStore = create<StudentState>()(
     (set, get) => ({
       classStudents: legacy.classStudents,
 
-      addClassStudent: ({ rollNumber, name }) => {
+      addClassStudent: ({ rollNumber, name, gender, mobileNumber }) => {
         const normalizedRoll = normalizeRoll(rollNumber)
         const normalizedName = normalizeName(name)
         if (!normalizedRoll || !normalizedName) {
@@ -56,6 +56,8 @@ export const useStudentStore = create<StudentState>()(
           rollNumber: normalizedRoll,
           name: normalizedName,
           status: "present",
+          gender,
+          mobileNumber: mobileNumber || "",
         }
 
         set((prev) => ({
@@ -64,10 +66,10 @@ export const useStudentStore = create<StudentState>()(
           ),
         }))
 
-        return { success: true, message: "Student added successfully." }
+        return { success: true, message: "Student added successfully.", studentId: newStudent.id }
       },
 
-      updateClassStudent: (id, { rollNumber, name }) => {
+      updateClassStudent: (id, { rollNumber, name, gender, mobileNumber }) => {
         const normalizedRoll = normalizeRoll(rollNumber)
         const normalizedName = normalizeName(name)
         if (!normalizedRoll || !normalizedName) {
@@ -86,7 +88,13 @@ export const useStudentStore = create<StudentState>()(
           classStudents: prev.classStudents
             .map((student) =>
               student.id === id
-                ? { ...student, rollNumber: normalizedRoll, name: normalizedName }
+                ? { 
+                    ...student, 
+                    rollNumber: normalizedRoll, 
+                    name: normalizedName, 
+                    gender: gender || student.gender,
+                    mobileNumber: mobileNumber !== undefined ? mobileNumber : student.mobileNumber
+                  }
                 : student
             )
             .sort((a, b) => a.rollNumber.localeCompare(b.rollNumber)),
@@ -102,40 +110,58 @@ export const useStudentStore = create<StudentState>()(
 
       importClassStudents: (entries) => {
         const state = get()
-        const existingRolls = new Set(state.classStudents.map((student) => normalizeRoll(student.rollNumber)))
-        const toAdd: Student[] = []
+        let added = 0
         let skipped = 0
+        const newStudents = [...state.classStudents]
+        const addedStudentIds: string[] = []
 
-        for (const entry of entries) {
-          const normalizedRoll = normalizeRoll(entry.rollNumber)
-          const normalizedName = normalizeName(entry.name)
-          if (!normalizedRoll || !normalizedName || existingRolls.has(normalizedRoll)) {
-            skipped += 1
-            continue
+        entries.forEach(({ rollNumber, name, gender, mobileNumber }) => {
+          const normalizedRoll = normalizeRoll(rollNumber)
+          const normalizedName = normalizeName(name)
+          if (!normalizedRoll || !normalizedName) {
+            skipped++
+            return
           }
 
-          existingRolls.add(normalizedRoll)
-          toAdd.push({
-            id: `student-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          const existsIdx = newStudents.findIndex(
+            (student) => normalizeRoll(student.rollNumber) === normalizedRoll
+          )
+          if (existsIdx !== -1) {
+            newStudents[existsIdx] = {
+              ...newStudents[existsIdx],
+              name: normalizedName,
+              gender: gender || newStudents[existsIdx].gender,
+              mobileNumber: mobileNumber || newStudents[existsIdx].mobileNumber || "",
+            }
+            addedStudentIds.push(newStudents[existsIdx].id)
+            added++
+            return
+          }
+
+          const newId = `student-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+          newStudents.push({
+            id: newId,
             rollNumber: normalizedRoll,
             name: normalizedName,
             status: "present",
+            gender: gender || "Male",
+            mobileNumber: mobileNumber || "",
+          })
+          addedStudentIds.push(newId)
+          added++
+        })
+
+        if (added > 0) {
+          set({
+            classStudents: newStudents.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber)),
           })
         }
 
-        if (toAdd.length > 0) {
-          set((prev) => ({
-            classStudents: [...prev.classStudents, ...toAdd].sort((a, b) =>
-              a.rollNumber.localeCompare(b.rollNumber)
-            ),
-          }))
-        }
-
-        return { added: toAdd.length, skipped }
+        return { added, skipped, addedStudentIds }
       },
     }),
     {
-      name: "attendance-student-store",
+      name: "attendance-student-store-v3",
       storage: createJSONStorage(() => localStorage),
     }
   )

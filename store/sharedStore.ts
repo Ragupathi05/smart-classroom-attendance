@@ -5,9 +5,11 @@ import type { AppNotification } from "@/types"
 interface SharedState {
   currentPage: string
   notifications: AppNotification[]
+  sidebarCollapsed: boolean
   setCurrentPage: (page: string) => void
   addNotification: (notification: Omit<AppNotification, "id" | "createdAt" | "read">) => void
   markNotificationsRead: () => void
+  setSidebarCollapsed: (collapsed: boolean) => void
 }
 
 const getLegacySharedState = () => {
@@ -34,8 +36,10 @@ export const useSharedStore = create<SharedState>()(
     (set) => ({
       currentPage: legacy.currentPage,
       notifications: legacy.notifications,
+      sidebarCollapsed: false,
 
       setCurrentPage: (page) => set({ currentPage: page }),
+      setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 
       addNotification: (notification) =>
         set((state) => ({

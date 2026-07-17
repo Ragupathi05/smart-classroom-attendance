@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Bell, User, Shield, School } from "lucide-react"
-import { useAuthStore, useSettingsStore } from "@/store"
+import { useAuthStore, useSettingsStore, useConfirmStore } from "@/store"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,12 +13,31 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { toast } from "react-toastify"
 
 export function Settings() {
-  const { user, updateUserProfile } = useAuthStore()
+  const { user, updateUserProfile, changeUserPassword } = useAuthStore()
   const { appSettings, updateAppSettings } = useSettingsStore()
+  const confirm = useConfirmStore((state) => state.confirm)
   const [name, setName] = useState(user?.name || "")
   const [email, setEmail] = useState(user?.email || "")
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [isProfileConfirmed, setIsProfileConfirmed] = useState(false)
+
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+
+  const handleChangePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+    const res = changeUserPassword(user.id, currentPassword, newPassword)
+    if (res.success) {
+      toast.success(res.message)
+      setShowPasswordDialog(false)
+      setCurrentPassword("")
+      setNewPassword("")
+    } else {
+      toast.error(res.message)
+    }
+  }
 
   const isProfileDirty =
     name.trim() !== (user?.name || "").trim() ||
@@ -49,11 +68,15 @@ export function Settings() {
       return
     }
 
-    const shouldConfirm = window.confirm("Confirm profile changes?")
-    if (!shouldConfirm) return
-
-    setIsProfileConfirmed(true)
-    toast.success("Changes confirmed. Click Save to apply.")
+    confirm({
+      title: "Confirm Profile Changes",
+      message: "Are you sure you want to confirm these changes to your profile settings?",
+      confirmText: "Confirm",
+      onConfirm: () => {
+        setIsProfileConfirmed(true)
+        toast.success("Changes confirmed. Click Save to apply.")
+      }
+    })
   }
 
   const handleSaveProfile = () => {
@@ -97,16 +120,16 @@ export function Settings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 text-center sm:text-left">
             <Avatar className="h-20 w-20">
               <AvatarFallback className="bg-primary text-2xl text-primary-foreground">
                 {user?.name?.charAt(0) || "U"}
               </AvatarFallback>
             </Avatar>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => toast.info("Avatar upload will be enabled soon")}>Change Avatar</Button>
+            <div className="flex flex-wrap items-center justify-center gap-2 w-full sm:w-auto">
+              <Button variant="outline" size="sm" onClick={() => toast.info("Avatar upload will be enabled soon")} className="flex-1 sm:flex-initial">Change Avatar</Button>
               {!isEditingProfile ? (
-                <Button size="sm" onClick={handleStartProfileEdit}>Edit Profile</Button>
+                <Button size="sm" onClick={handleStartProfileEdit} className="flex-1 sm:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground">Edit Profile</Button>
               ) : null}
             </div>
           </div>
@@ -133,6 +156,7 @@ export function Settings() {
                 id="email"
                 type="email"
                 value={email}
+                placeholder="e.g. name@mits.ac.in"
                 onChange={(event) => {
                   setIsProfileConfirmed(false)
                   setEmail(event.target.value)
@@ -163,12 +187,12 @@ export function Settings() {
           </div>
           
           {isEditingProfile ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={handleCancelProfileEdit}>Cancel</Button>
-              <Button variant="secondary" onClick={handleConfirmProfile}>
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <Button variant="outline" onClick={handleCancelProfileEdit} className="flex-1 sm:flex-initial">Cancel</Button>
+              <Button variant="secondary" onClick={handleConfirmProfile} className="flex-1 sm:flex-initial">
                 Confirm
               </Button>
-              <Button onClick={handleSaveProfile} disabled={!isProfileConfirmed || !isProfileDirty}>
+              <Button onClick={handleSaveProfile} disabled={!isProfileConfirmed || !isProfileDirty} className="flex-1 sm:flex-initial">
                 Save
               </Button>
             </div>
@@ -301,7 +325,7 @@ export function Settings() {
                 Update your account password
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => toast.info("Password reset flow will be connected to backend")}>Change</Button>
+            <Button variant="outline" size="sm" onClick={() => setShowPasswordDialog(true)}>Change</Button>
           </div>
           <Separator className="bg-border" />
           <div className="flex items-center justify-between">
@@ -321,6 +345,59 @@ export function Settings() {
           </div>
         </CardContent>
       </Card>
+
+      {showPasswordDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-card border border-border p-6 rounded-2xl w-full max-w-md space-y-4 shadow-xl text-xs font-bold">
+            <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Change Password</h3>
+            <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-muted-foreground uppercase tracking-widest text-[9px] mb-1">Current Password</label>
+                <Input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => {
+                    setCurrentPassword(e.target.value)
+                  }}
+                  placeholder="Enter current password"
+                  className="h-9 text-xs font-semibold rounded-lg text-foreground bg-input/40 border border-border"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-muted-foreground uppercase tracking-widest text-[9px] mb-1">New Password</label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value)
+                  }}
+                  placeholder="Enter new password (min. 4 chars)"
+                  className="h-9 text-xs font-semibold rounded-lg text-foreground bg-input/40 border border-border"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowPasswordDialog(false)
+                    setCurrentPassword("")
+                    setNewPassword("")
+                  }}
+                  className="text-xs font-bold rounded-lg h-9"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="text-xs font-bold rounded-lg h-9">
+                  Update Password
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   )
