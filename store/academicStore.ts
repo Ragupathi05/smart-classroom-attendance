@@ -329,6 +329,11 @@ export const useAcademicStore = create<AcademicState>()(
           localStorage.setItem(`crlr-assign-${sectionId}`, JSON.stringify({ crName, lrName }))
         }
 
+        // Persist database CR/LR assignments in Supabase
+        const activeSessionId = state.currentSessionId
+        const SupabaseService = require("@/services/SupabaseService").SupabaseService
+        SupabaseService.assignCRLRInSupabase(sectionId, crName, lrName, activeSessionId).catch(console.error)
+
         return {
           sections: state.sections.map((s) => 
             s.id === sectionId ? { ...s, crName, lrName } : s

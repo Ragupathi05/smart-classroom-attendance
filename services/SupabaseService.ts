@@ -209,7 +209,7 @@ export const SupabaseService = {
           .eq("section_id", s.id)
           .eq("is_active", true)
 
-        // Fetch CR / LR names
+        // Fetch CR / LR names from section_role_assignments
         const { data: roles } = await supabase
           .from("section_role_assignments")
           .select(`
@@ -223,6 +223,29 @@ export const SupabaseService = {
 
         const crObj = (roles || []).find(r => r.role === "CR")
         const lrObj = (roles || []).find(r => r.role === "LR")
+
+        // Fallback: Fetch CR / LR names from student_section_assignments (roll_no_in_class)
+        const { data: localRoles } = await supabase
+          .from("student_section_assignments")
+          .select(`
+            roll_no_in_class,
+            students (
+              full_name
+            )
+          `)
+          .eq("section_id", s.id)
+          .in("roll_no_in_class", ["CR", "LR"])
+
+        const localCr = (localRoles || []).find(r => r.roll_no_in_class === "CR")
+        const localLr = (localRoles || []).find(r => r.roll_no_in_class === "LR")
+
+        const crName = crObj 
+          ? (crObj.users as any)?.full_name || "Unassigned" 
+          : (localCr ? (localCr.students as any)?.full_name || "Unassigned" : "Unassigned")
+
+        const lrName = lrObj 
+          ? (lrObj.users as any)?.full_name || "Unassigned" 
+          : (localLr ? (localLr.students as any)?.full_name || "Unassigned" : "Unassigned")
 
         // Fetch faculty assignment count
         const { count: facultyCount } = await supabase
@@ -240,8 +263,8 @@ export const SupabaseService = {
           semester: s.semester % 2 === 0 ? "Even" : "Odd",
           sectionName: s.section_name,
           studentCount: studentCount || 0,
-          crName: crObj ? (crObj.users as any)?.full_name || "Unassigned" : "Unassigned",
-          lrName: lrObj ? (lrObj.users as any)?.full_name || "Unassigned" : "Unassigned",
+          crName: crName,
+          lrName: lrName,
           facultyCount: facultyCount || 0,
           status: s.is_active ? "Active" : "Inactive",
           batchId: s.program_id, // Map program_id as batchId for category filtering
@@ -293,6 +316,61 @@ export const SupabaseService = {
     } catch (err) {
       console.warn("Bypassed Supabase write / offline mode for section:", err?.message || err)
       return null
+    }
+  },
+
+  async assignCRLRInSupabase(sectionId: string, crName: string, lrName: string, sessionId: string): Promise<boolean> {
+    try {
+      // 1. Reset existing CR/LR roles for this section and session
+      await supabase
+        .from("student_section_assignments")
+        .update({ roll_no_in_class: null })
+        .eq("section_id", sectionId)
+        .eq("academic_session_id", sessionId)
+        .in("roll_no_in_class", ["CR", "LR"])
+
+      // 2. Find the student who is assigned as CR
+      if (crName && crName !== "To be assigned" && crName !== "Unassigned") {
+        const { data: crStud } = await supabase
+          .from("students")
+          .select("id")
+          .eq("full_name", crName)
+          .limit(1)
+          .maybeSingle()
+
+        if (crStud) {
+          await supabase
+            .from("student_section_assignments")
+            .update({ roll_no_in_class: "CR" })
+            .eq("student_id", crStud.id)
+            .eq("section_id", sectionId)
+            .eq("academic_session_id", sessionId)
+        }
+      }
+
+      // 3. Find the student who is assigned as LR
+      if (lrName && lrName !== "To be assigned" && lrName !== "Unassigned") {
+        const { data: lrStud } = await supabase
+          .from("students")
+          .select("id")
+          .eq("full_name", lrName)
+          .limit(1)
+          .maybeSingle()
+
+        if (lrStud) {
+          await supabase
+            .from("student_section_assignments")
+            .update({ roll_no_in_class: "LR" })
+            .eq("student_id", lrStud.id)
+            .eq("section_id", sectionId)
+            .eq("academic_session_id", sessionId)
+        }
+      }
+
+      return true
+    } catch (err) {
+      console.error("Error assigning CR/LR in Supabase:", err)
+      return false
     }
   },
 
