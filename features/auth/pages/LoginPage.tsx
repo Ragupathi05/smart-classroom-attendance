@@ -24,6 +24,11 @@ export function LoginPage() {
   const [phone, setPhone] = useState("")
   const [deptName, setDeptName] = useState("")
   const [deptCode, setDeptCode] = useState("")
+  const [setupCode, setSetupCode] = useState("")
+
+  // Secret code baked in at build time from GitHub Secret
+  const HOD_SETUP_CODE = process.env.NEXT_PUBLIC_HOD_SETUP_CODE || ""
+
 
   const login = useAuthStore((state) => state.login)
   const registerHOD = useAuthStore((state) => state.registerHOD)
@@ -55,6 +60,11 @@ export function LoginPage() {
     if (isRegisterMode) {
       if (!canRegisterHOD) {
         setError("An HOD account has already been configured. Registration is locked.")
+        return
+      }
+      // Verify the secret setup code
+      if (HOD_SETUP_CODE && setupCode.trim() !== HOD_SETUP_CODE) {
+        setError("Invalid Institution Setup Code. Contact your system administrator.")
         return
       }
       if (!fullName || !email || !password || !phone || !deptName || !deptCode) {
@@ -250,6 +260,22 @@ export function LoginPage() {
                         />
                       </Field>
                     </div>
+
+                    <Field>
+                      <FieldLabel htmlFor="setupCode" className="flex items-center gap-1.5">
+                        <Shield className="h-3 w-3 text-amber-500" />
+                        Institution Setup Code
+                      </FieldLabel>
+                      <Input
+                        id="setupCode"
+                        type="password"
+                        placeholder="Enter the secret setup code"
+                        value={setupCode}
+                        onChange={(e) => setSetupCode(e.target.value)}
+                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg border-amber-500/30 focus:border-amber-500/60"
+                      />
+                      <p className="text-[10px] text-muted-foreground mt-1">This code was provided by your IT administrator at the time of deployment.</p>
+                    </Field>
                   </>
                 )}
               </FieldGroup>

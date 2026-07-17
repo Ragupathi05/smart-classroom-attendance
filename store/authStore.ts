@@ -131,46 +131,41 @@ export const useAuthStore = create<AuthState>()(
           }
         }
 
-        // 2. Fallback to Local Auth (CR/LR and Local HOD/Faculty test credentials)
+        // 2. Fallback to Local Auth (CR/LR only — HOD and Faculty MUST use Supabase email login)
         let detectedRole = role
-        if (!detectedRole) {
-          if (lower.includes("hod")) {
-            detectedRole = "hod"
-          } else {
-            // Check if this is a student roll number assigned as CR or LR
-            const rollNumber = lower.replace("-cr", "").replace("-lr", "")
-            const { useStudentStore, useAcademicStore } = require("@/store")
-            const students = useStudentStore.getState().classStudents || []
-            const student = students.find((s: any) => s.rollNumber.toLowerCase() === rollNumber)
 
-            if (student) {
-              const sections = useAcademicStore.getState().sections || []
-              const isLr = sections.some((sec: any) => sec.lrName === student.name)
-              const isCr = sections.some((sec: any) => sec.crName === student.name)
-              
-              if (isLr) {
-                detectedRole = "lr"
-              } else if (isCr) {
-                detectedRole = "cr"
-              } else {
-                detectedRole = "cr" // default fallback
-              }
-            } else if (lower.endsWith("-cr") || lower.includes("cr")) {
-              detectedRole = "cr"
-            } else if (lower.endsWith("-lr") || lower.includes("lr")) {
-              detectedRole = "lr"
-            } else {
-              detectedRole = "faculty"
-            }
+        // Only allow local login for CR/LR roll-number based access
+        const isCrLrFormat = lower.endsWith("-cr") || lower.endsWith("-lr") ||
+          lower.includes("-cr-") || lower.includes("-lr-")
+
+        if (!isCrLrFormat) {
+          // Not a CR/LR format — reject (HOD/Faculty must use email login above)
+          return false
+        }
+
+        if (!detectedRole) {
+          const rollNumber = lower.replace(/-cr$/, "").replace(/-lr$/, "")
+          const { useStudentStore, useAcademicStore } = require("@/store")
+          const students = useStudentStore.getState().classStudents || []
+          const student = students.find((s: any) => s.rollNumber.toLowerCase() === rollNumber)
+
+          if (student) {
+            const sections = useAcademicStore.getState().sections || []
+            const isLr = sections.some((sec: any) => sec.lrName === student.name)
+            const isCr = sections.some((sec: any) => sec.crName === student.name)
+            detectedRole = isLr ? "lr" : isCr ? "cr" : (lower.endsWith("-lr") ? "lr" : "cr")
+          } else {
+            detectedRole = lower.endsWith("-lr") ? "lr" : "cr"
           }
         }
 
         const state = get()
         const storedPassword = state.userPasswords?.[lower]
-        const defaultPassword = 
+        const defaultPassword =
           detectedRole === "cr" ? "MITS@CR123" :
-          detectedRole === "lr" ? "MITS@LR123" :
-          detectedRole === "hod" ? "admin" : "faculty"
+          detectedRole === "lr" ? "MITS@LR123" : null
+
+        if (!defaultPassword) return false
 
         const activePassword = storedPassword || defaultPassword
         if (password !== activePassword) {
