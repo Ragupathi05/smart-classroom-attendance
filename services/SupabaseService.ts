@@ -72,7 +72,7 @@ export const SupabaseService = {
       return (data || []).map(s => ({
         id: s.id,
         name: s.session_name,
-        status: s.is_active ? "ACTIVE" : "INACTIVE"
+        status: s.status === "ACTIVE" ? "ACTIVE" : "INACTIVE"
       }))
     } catch (err) {
       console.error("Error fetching academic sessions:", err)
@@ -84,7 +84,7 @@ export const SupabaseService = {
     try {
       // If active, disable other active sessions first
       if (session.status === "ACTIVE") {
-        await supabase.from("academic_sessions").update({ is_active: false }).eq("is_active", true)
+        await supabase.from("academic_sessions").update({ status: "INACTIVE" }).eq("status", "ACTIVE")
       }
 
       const { data, error } = await supabase
@@ -95,7 +95,7 @@ export const SupabaseService = {
           end_year: endYear,
           start_date: startDate,
           end_date: endDate,
-          is_active: session.status === "ACTIVE"
+          status: session.status
         })
         .select("*")
         .single()
@@ -104,7 +104,7 @@ export const SupabaseService = {
       return {
         id: data.id,
         name: data.session_name,
-        status: data.is_active ? "ACTIVE" : "INACTIVE"
+        status: data.status === "ACTIVE" ? "ACTIVE" : "INACTIVE"
       }
     } catch (err) {
       console.warn("Bypassed Supabase write / offline mode for session:", err?.message || err)
@@ -509,7 +509,7 @@ export const SupabaseService = {
       const endYear = years[1] || 2028
 
       // Disable other sessions
-      await supabase.from("academic_sessions").update({ is_active: false }).eq("is_active", true)
+      await supabase.from("academic_sessions").update({ status: "INACTIVE" }).eq("status", "ACTIVE")
 
       // Insert or get new session
       const { data: existingSession } = await supabase
@@ -528,14 +528,14 @@ export const SupabaseService = {
             end_year: endYear,
             start_date: `${startYear}-06-01`,
             end_date: `${endYear}-05-30`,
-            is_active: true
+            status: "ACTIVE"
           })
           .select("id")
           .single()
         if (sessError) throw sessError
         finalSessionId = newSess.id
       } else {
-        await supabase.from("academic_sessions").update({ is_active: true }).eq("id", finalSessionId)
+        await supabase.from("academic_sessions").update({ status: "ACTIVE" }).eq("id", finalSessionId)
       }
 
       // Update department settings active session

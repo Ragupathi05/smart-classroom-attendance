@@ -648,8 +648,8 @@ export const useAcademicStore = create<AcademicState>()(
         // Persist active status change to Supabase in the background
         try {
           const { supabase } = require("@/lib/supabase/client")
-          supabase.from("academic_sessions").update({ is_active: false }).eq("is_active", true).then(() => {
-            supabase.from("academic_sessions").update({ is_active: true }).eq("id", id).catch(console.error)
+          supabase.from("academic_sessions").update({ status: "INACTIVE" }).eq("status", "ACTIVE").then(() => {
+            supabase.from("academic_sessions").update({ status: "ACTIVE" }).eq("id", id).catch(console.error)
           }).catch(console.error)
         } catch (e) {
           console.error("Failed to update active session in Supabase:", e)
