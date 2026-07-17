@@ -161,7 +161,7 @@ export const useStudentStore = create<StudentState>()(
       },
     }),
     {
-      name: "attendance-student-store-v3",
+      name: "attendance-student-store-v4",
       storage: createJSONStorage(() => localStorage),
     }
   )
