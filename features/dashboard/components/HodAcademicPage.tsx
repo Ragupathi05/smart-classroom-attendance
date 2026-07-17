@@ -479,7 +479,9 @@ export function HodAcademicPage() {
 
   // Filter students based on active section and search query
   const filteredStudents = useMemo(() => {
-    const roster = selectedSectionWorkspace ? getSectionRoster(selectedSectionWorkspace) : []
+    const roster = selectedSectionWorkspace ? [...getSectionRoster(selectedSectionWorkspace)] : []
+    // Sort roster by roll number
+    roster.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber))
     if (!searchStudentQuery.trim()) return roster
     const q = searchStudentQuery.toLowerCase()
     return roster.filter((s) => s.name.toLowerCase().includes(q) || s.rollNumber.toLowerCase().includes(q))
