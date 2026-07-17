@@ -3,23 +3,8 @@ import { persist, createJSONStorage } from "zustand/middleware"
 import { useTimetableStore } from "./timetableStore"
 import { useStudentStore } from "./studentStore"
 import type { Student, StudentSectionAssignment } from "@/types"
-import { StudentService } from "@/services/StudentService"
 
-const getInitialEnrollments = (): StudentSectionAssignment[] => {
-  try {
-    const seed = StudentService.getSeedStudents()
-    return seed.map((s) => ({
-      id: `enroll-${s.id}`,
-      studentId: s.id,
-      sectionId: "sec-1",
-      academicSessionId: "session-2026-2027",
-      status: "Active" as const,
-      joinedOn: "2026-06-01"
-    }))
-  } catch (e) {
-    return []
-  }
-}
+
 
 export interface AcademicSession {
   id: string
@@ -145,90 +130,8 @@ interface AcademicState {
   syncWithSupabase: () => Promise<void>
 }
 
-const mockBatches: AcademicBatch[] = [
-  { id: "batch-1", name: "2023-2027 Batch", startYear: 2023, endYear: 2027, currentYearLevel: "3rd Year", currentSemester: "Odd", status: "ACTIVE" },
-  { id: "batch-2", name: "2024-2028 Batch", startYear: 2024, endYear: 2028, currentYearLevel: "2nd Year", currentSemester: "Odd", status: "ACTIVE" },
-  { id: "batch-3", name: "2022-2026 Batch", startYear: 2022, endYear: 2026, currentYearLevel: "Graduated", currentSemester: "Even", status: "GRADUATED" },
-]
 
-const mockPrograms: Program[] = [
-  { id: "prog-1", name: "B.Tech (CSE)", years: 4, studentCount: 720, sectionCount: 12 },
-  { id: "prog-2", name: "M.Tech (CSE)", years: 2, studentCount: 120, sectionCount: 4 },
-  { id: "prog-3", name: "MBA", years: 2, studentCount: 240, sectionCount: 6 },
-  { id: "prog-4", name: "MCA", years: 2, studentCount: 180, sectionCount: 4 },
-]
 
-const mockSections: Section[] = [
-  { id: "sec-1", name: "III CSE A", year: "3rd Year", semester: "Odd", sectionName: "A", studentCount: 72, crName: "Abilash", lrName: "Akhila", facultyCount: 8, status: "Active", batchId: "batch-1", academicSessionId: "session-2026-2027" },
-  { id: "sec-2", name: "III CSE B", year: "3rd Year", semester: "Odd", sectionName: "B", studentCount: 68, crName: "Rahul", lrName: "Priya", facultyCount: 7, status: "Active", batchId: "batch-1", academicSessionId: "session-2026-2027" },
-  { id: "sec-3", name: "II CSE A", year: "2nd Year", semester: "Odd", sectionName: "A", studentCount: 70, crName: "Chandra", lrName: "Charitha", facultyCount: 6, status: "Active", batchId: "batch-2", academicSessionId: "session-2026-2027" },
-]
-
-const mockFaculty: FacultyMember[] = [
-  {
-    id: "fac-1",
-    code: "CSE-F01",
-    name: "Mr. P. Udayakumar",
-    department: "Computer Science & Engineering",
-    email: "udayakumar@mits.ac.in",
-    phone: "9876543210",
-    subjects: ["Deep Learning (DL)", "Software Engineering (SE)"],
-    sections: ["III CSE A", "III CSE B"],
-    weeklyLoad: 12,
-    weeklyWorkloadLimit: 16,
-    attendancePending: 2,
-    status: "Active",
-    photo: ""
-  },
-  {
-    id: "fac-2",
-    code: "CSE-F02",
-    name: "Dr. Kumar",
-    department: "Computer Science & Engineering",
-    email: "kumar@mits.ac.in",
-    phone: "9123456789",
-    subjects: ["Cloud Computing (CC)", "Machine Learning (ML)"],
-    sections: ["III CSE A", "III AIML B"],
-    weeklyLoad: 14,
-    weeklyWorkloadLimit: 18,
-    attendancePending: 1,
-    status: "Active",
-    photo: ""
-  },
-  {
-    id: "fac-3",
-    code: "CSE-F03",
-    name: "Dr. Arunkumar",
-    department: "Computer Science & Engineering",
-    email: "arunkumar@mits.ac.in",
-    phone: "9345678901",
-    subjects: ["System Software (SS)", "Signals & Systems"],
-    sections: ["III CSE A", "III CSE B"],
-    weeklyLoad: 10,
-    weeklyWorkloadLimit: 16,
-    attendancePending: 0,
-    status: "Active",
-    photo: ""
-  }
-]
-
-const mockActivities: DepartmentActivity[] = [
-  { id: "act-1", time: "09:15 AM", date: "Today", type: "Faculty Added", detail: "Dr. Kumar was assigned to CSE Department." },
-  { id: "act-2", time: "09:32 AM", date: "Today", type: "Students Imported", detail: "Roster database imported for III CSE A." },
-  { id: "act-3", time: "10:05 AM", date: "Today", type: "Attendance Submitted", detail: "Deep Learning attendance marked by Mr. P. Udayakumar." },
-  { id: "act-4", time: "11:40 AM", date: "Today", type: "Workshop Scheduled", detail: "IEEE Workshop declared on Friday by HOD." },
-]
-
-const mockNotifications: HodNotification[] = [
-  { id: "notif-1", title: "IEEE Workshop Scheduled", body: "An IEEE Workshop is scheduled for Friday. Attendance not required.", target: "Entire Department", schedule: "Immediately", sentAt: "2026-07-12 11:40 AM" }
-]
-
-const mockCrlrHistory: CRLRAssignmentHistoryEntry[] = [
-  { id: "hist-1", sectionId: "sec-1", role: "cr", studentName: "Abilash", assignedDate: "2026-06-01" },
-  { id: "hist-2", sectionId: "sec-1", role: "lr", studentName: "Akhila", assignedDate: "2026-06-01" },
-  { id: "hist-3", sectionId: "sec-2", role: "cr", studentName: "Rahul", assignedDate: "2026-06-01" },
-  { id: "hist-4", sectionId: "sec-2", role: "lr", studentName: "Priya", assignedDate: "2026-06-01" },
-]
 
 export const useAcademicStore = create<AcademicState>()(
   persist(
@@ -845,7 +748,7 @@ export const useAcademicStore = create<AcademicState>()(
       },
     }),
     {
-      name: "attendance-academic-store-v7",
+      name: "attendance-academic-store-v8",
       storage: createJSONStorage(() => localStorage),
     }
   )

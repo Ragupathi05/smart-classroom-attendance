@@ -1,6 +1,4 @@
-"use client"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { GraduationCap, Eye, EyeOff, Users, BookOpen, Shield } from "lucide-react"
 import { useAuthStore } from "@/store"
 import { Button } from "@/components/ui/button"
@@ -8,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { toast } from "react-toastify"
+import { supabase } from "@/lib/supabase/client"
 
 export function LoginPage() {
   const [userId, setUserId] = useState("")
@@ -19,6 +18,7 @@ export function LoginPage() {
   
   // Registration specific states
   const [isRegisterMode, setIsRegisterMode] = useState(false)
+  const [canRegisterHOD, setCanRegisterHOD] = useState(false)
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
@@ -28,11 +28,35 @@ export function LoginPage() {
   const login = useAuthStore((state) => state.login)
   const registerHOD = useAuthStore((state) => state.registerHOD)
 
+  // Query Supabase on mount to see if an HOD account has already been bootstrapped
+  useEffect(() => {
+    async function checkHODs() {
+      try {
+        const { count, error } = await supabase
+          .from("users")
+          .select("id", { count: "exact", head: true })
+          .eq("role", "HOD")
+        
+        if (!error) {
+          // If no HOD exists, allow registration. If one exists, block registration.
+          setCanRegisterHOD(count === 0)
+        }
+      } catch (err) {
+        console.error("Failed to check existing HOD accounts:", err)
+      }
+    }
+    checkHODs()
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
 
     if (isRegisterMode) {
+      if (!canRegisterHOD) {
+        setError("An HOD account has already been configured. Registration is locked.")
+        return
+      }
       if (!fullName || !email || !password || !phone || !deptName || !deptCode) {
         setError("All fields are required for HOD registration")
         return
@@ -101,7 +125,7 @@ export function LoginPage() {
             <CardDescription className="text-xs font-semibold text-muted-foreground">
               {isRegisterMode 
                 ? "Setup a new HOD profile & department" 
-                : "Auto-detects HOD, Faculty, CR, or LR workspaces"}
+                : "Enter your registered credentials to sign in"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -110,11 +134,11 @@ export function LoginPage() {
                 {!isRegisterMode ? (
                   <>
                     <Field>
-                      <FieldLabel htmlFor="userId">User ID / Username</FieldLabel>
+                      <FieldLabel htmlFor="userId">Username / Email</FieldLabel>
                       <Input
                         id="userId"
                         type="text"
-                        placeholder="e.g. III-CSE-A-CR or CSE-HOD or dr-kumar"
+                        placeholder="e.g. hod@mits.ac.in or III-CSE-A-CR"
                         value={userId}
                         onChange={(e) => setUserId(e.target.value)}
                         className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
@@ -270,51 +294,23 @@ export function LoginPage() {
                 )}
               </Button>
 
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError("")
-                    setIsRegisterMode(!isRegisterMode)
-                  }}
-                  className="text-xs font-bold text-primary hover:underline"
-                >
-                  {isRegisterMode ? "Back to Sign In" : "Need to set up the HOD account? Register here"}
-                </button>
-              </div>
+              {canRegisterHOD && (
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError("")
+                      setIsRegisterMode(!isRegisterMode)
+                    }}
+                    className="text-xs font-bold text-primary hover:underline"
+                  >
+                    {isRegisterMode ? "Back to Sign In" : "Need to set up the HOD account? Register here"}
+                  </button>
+                </div>
+              )}
             </form>
           </CardContent>
         </Card>
-
-        {/* Demo Hints Footer */}
-        {!isRegisterMode && (
-          <div className="mt-5 rounded-2xl border border-border bg-card/65 p-4 backdrop-blur-sm space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground text-center">
-              Demo Credentials (Auto-Role detection)
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-muted-foreground/80">
-              <div className="flex items-center gap-1.5 bg-secondary/30 p-2 rounded-lg">
-                <span className="text-primary">💼 HOD:</span>
-                <code className="text-foreground">CSE-HOD</code>
-              </div>
-              <div className="flex items-center gap-1.5 bg-secondary/30 p-2 rounded-lg">
-                <span className="text-primary">🎓 CR:</span>
-                <code className="text-foreground">III-CSE-A-CR</code>
-              </div>
-              <div className="flex items-center gap-1.5 bg-secondary/30 p-2 rounded-lg">
-                <span className="text-primary">👩‍🎓 LR:</span>
-                <code className="text-foreground">III-CSE-A-LR</code>
-              </div>
-              <div className="flex items-center gap-1.5 bg-secondary/30 p-2 rounded-lg">
-                <span className="text-primary">🏫 Faculty:</span>
-                <code className="text-foreground">dr-kumar</code>
-              </div>
-            </div>
-            <p className="text-[9px] text-muted-foreground/60 text-center font-semibold italic mt-1">
-              *Use any non-empty string for password.
-            </p>
-          </div>
-        )}
       </div>
     </div>
   )

@@ -37,104 +37,7 @@ interface AttendanceState {
   syncWithRoster: (roster: Student[]) => void
 }
 
-const getSeedAttendanceRecords = (): AttendanceRecord[] => {
-  try {
-    const students = StudentService.getSeedStudents()
-    const today = new Date().toISOString().split("T")[0]
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split("T")[0]
 
-    const getStudentsWithStatus = (classIndex: number) => {
-      return students.map((s, idx) => {
-        let status: AttendanceStatus = "present"
-        if (idx === 1) {
-          status = classIndex % 2 === 0 ? "absent" : "present"
-        } else if (idx === 4 || idx === 12) {
-          status = classIndex < 4 ? "absent" : "present"
-        } else if (idx === 18) {
-          status = "permission"
-        } else if (Math.random() < 0.05) {
-          status = "absent"
-        }
-        return { ...s, status }
-      })
-    }
-
-    return [
-      {
-        id: "seed-rec-1",
-        subject: "Deep Learning (DL)",
-        subjectCode: "DL",
-        date: today,
-        timeSlot: "9:10-10:10",
-        className: "III CSE A",
-        sectionId: "sec-1",
-        academicSessionId: "session-2026-2027",
-        students: getStudentsWithStatus(0),
-        cellIds: ["cell-dl-1"],
-        submittedAt: new Date().toISOString(),
-        submittedBy: "FACULTY - Mr. P. Udayakumar"
-      },
-      {
-        id: "seed-rec-2",
-        subject: "Software Engineering (SE)",
-        subjectCode: "SE",
-        date: today,
-        timeSlot: "10:10-11:10",
-        className: "III CSE A",
-        sectionId: "sec-1",
-        academicSessionId: "session-2026-2027",
-        students: getStudentsWithStatus(1),
-        cellIds: ["cell-se-1"],
-        submittedAt: new Date().toISOString(),
-        submittedBy: "FACULTY - Mr. P. Udayakumar"
-      },
-      {
-        id: "seed-rec-3",
-        subject: "Cloud Computing (CC)",
-        subjectCode: "CC",
-        date: yesterday,
-        timeSlot: "9:10-10:10",
-        className: "III CSE A",
-        sectionId: "sec-1",
-        academicSessionId: "session-2026-2027",
-        students: getStudentsWithStatus(2),
-        cellIds: ["cell-cc-1"],
-        submittedAt: new Date().toISOString(),
-        submittedBy: "FACULTY - Dr. Kumar"
-      },
-      {
-        id: "seed-rec-4",
-        subject: "Deep Learning (DL)",
-        subjectCode: "DL",
-        date: yesterday,
-        timeSlot: "10:10-11:10",
-        className: "III CSE A",
-        sectionId: "sec-1",
-        academicSessionId: "session-2026-2027",
-        students: getStudentsWithStatus(3),
-        cellIds: ["cell-dl-2"],
-        submittedAt: new Date().toISOString(),
-        submittedBy: "FACULTY - Mr. P. Udayakumar"
-      },
-      {
-        id: "seed-rec-5",
-        subject: "Software Engineering (SE)",
-        subjectCode: "SE",
-        date: yesterday,
-        timeSlot: "11:10-12:10",
-        className: "III CSE A",
-        sectionId: "sec-1",
-        academicSessionId: "session-2026-2027",
-        students: getStudentsWithStatus(4),
-        cellIds: ["cell-se-2"],
-        submittedAt: new Date().toISOString(),
-        submittedBy: "FACULTY - Mr. P. Udayakumar"
-      }
-    ]
-  } catch (e) {
-    return []
-  }
-}
 
 const getLegacyAttendanceState = () => {
   const records: AttendanceRecord[] = []
@@ -718,7 +621,7 @@ export const useAttendanceStore = create<AttendanceState>()(
       },
     }),
     {
-      name: "attendance-records-store",
+      name: "attendance-records-store-v2",
       storage: createJSONStorage(() => localStorage),
     }
   )

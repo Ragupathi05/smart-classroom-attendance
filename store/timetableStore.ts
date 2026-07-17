@@ -6,6 +6,7 @@ import { AppSyncService } from "@/services/AppSyncService"
 import { getISOWeekKey } from "@/utils/date-helpers"
 import { SUBJECTS, SUBJECT_FACULTY } from "@/constants"
 
+
 interface TimetableState {
   timetables: Record<string, TimetableCell[]>
   currentSectionFilter: string
@@ -26,51 +27,7 @@ interface TimetableState {
   clearTimetable: () => void
 }
 
-const getInitialTimetables = (): Record<string, TimetableCell[]> => {
-  const seedA = TimetableService.generateTimetable().map(cell => ({
-    ...cell,
-    sectionId: "sec-1",
-    academicSessionId: "session-2026-2027",
-    isPublished: true
-  }))
-  const seedB = seedA.map((cell) => {
-    let subjectCode = cell.subjectCode
-    let subjectName = cell.subjectName
-    let facultyName = cell.facultyName
-    if (cell.day === "Monday" && cell.timeSlot === "9:10-10:10") {
-      subjectCode = "ML"
-      subjectName = SUBJECTS["ML"]
-      facultyName = "Dr. Kumar"
-    }
-    if (cell.day === "Tuesday" && cell.timeSlot === "10:10-11:10") {
-      subjectCode = "SE"
-      subjectName = SUBJECTS["SE"]
-      facultyName = "Mr. P. Udayakumar"
-    }
-    return {
-      ...cell,
-      id: `sec-2-${cell.id}`,
-      sectionId: "sec-2",
-      academicSessionId: "session-2026-2027",
-      isPublished: true,
-      subjectCode,
-      subjectName,
-      facultyName
-    }
-  })
-  const seedC = seedA.map((cell) => ({
-    ...cell,
-    id: `sec-3-${cell.id}`,
-    sectionId: "sec-3",
-    academicSessionId: "session-2026-2027",
-    isPublished: true
-  }))
-  return {
-    "sec-1": seedA,
-    "sec-2": seedB,
-    "sec-3": seedC,
-  }
-}
+
 
 export const useTimetableStore = create<TimetableState>()(
   persist(
@@ -265,7 +222,7 @@ export const useTimetableStore = create<TimetableState>()(
       }),
     }),
     {
-      name: "attendance-timetable-store",
+      name: "attendance-timetable-store-v2",
       storage: createJSONStorage(() => localStorage),
     }
   )

@@ -379,7 +379,7 @@ export const useAuthStore = create<AuthState>()(
 
     }),
     {
-      name: "attendance-auth-store",
+      name: "attendance-auth-store-v2",
       storage: createJSONStorage(() => localStorage),
     }
   )
