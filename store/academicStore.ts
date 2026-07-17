@@ -706,7 +706,30 @@ export const useAcademicStore = create<AcademicState>()(
           const { SupabaseService } = require("@/services/SupabaseService")
           const deptId = await SupabaseService.getOrInitializeDepartmentId()
           
-          const sessions = await SupabaseService.fetchAcademicSessions()
+          let sessions = await SupabaseService.fetchAcademicSessions()
+          
+          // Auto-bootstrap active session if database is empty
+          if (sessions.length === 0) {
+            const currentYear = new Date().getFullYear()
+            const sessionName = `${currentYear}-${currentYear + 1}`
+            const startYear = currentYear
+            const endYear = currentYear + 1
+            const startDate = `${startYear}-06-01`
+            const endDate = `${endYear}-05-31`
+            
+            try {
+              const res = await SupabaseService.createAcademicSession({
+                name: sessionName,
+                status: "ACTIVE"
+              }, startYear, endYear, startDate, endDate)
+              if (res) {
+                sessions = [res]
+              }
+            } catch (err) {
+              console.error("Failed to auto-bootstrap academic session:", err)
+            }
+          }
+
           const activeSession = sessions.find((s: any) => s.status === "ACTIVE")
           
           const programs = await SupabaseService.fetchPrograms()
