@@ -580,7 +580,9 @@ export const useAcademicStore = create<AcademicState>()(
           .map(e => e.studentId)
         
         const allStudents = useStudentStore.getState().classStudents || []
-        return allStudents.filter(s => sectionStudentIds.includes(s.id))
+        const roster = allStudents.filter(s => sectionStudentIds.includes(s.id))
+        roster.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber))
+        return roster
       },
 
       getSectionStudentsWithStatus: (sectionId) => {
@@ -592,7 +594,7 @@ export const useAcademicStore = create<AcademicState>()(
         
         const allStudents = useStudentStore.getState().classStudents || []
 
-        return assignments.map(enroll => {
+        const list = assignments.map(enroll => {
           const student = allStudents.find(s => s.id === enroll.studentId)
           if (!student) return null
           return {
@@ -600,6 +602,9 @@ export const useAcademicStore = create<AcademicState>()(
             enrollmentStatus: enroll.status
           }
         }).filter(Boolean) as (Student & { enrollmentStatus: "Active" | "Inactive" | "Completed" | "Alumni" })[]
+
+        list.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber))
+        return list
       },
 
       transferStudent: (studentId, fromSectionId, toSectionId) => set((state) => {
