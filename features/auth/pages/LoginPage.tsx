@@ -16,29 +16,58 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  
+  // Registration specific states
+  const [isRegisterMode, setIsRegisterMode] = useState(false)
+  const [fullName, setFullName] = useState("")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
+  const [deptName, setDeptName] = useState("")
+  const [deptCode, setDeptCode] = useState("")
+
   const login = useAuthStore((state) => state.login)
+  const registerHOD = useAuthStore((state) => state.registerHOD)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
 
-    if (!userId || !password) {
-      setError("Please fill in all fields")
-      return
-    }
-
-    setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 800))
-
-    // Call login with auto-detection (pass role as undefined/empty, which triggers store auto-detect)
-    const success = await login(userId, password, undefined as any)
-    if (!success) {
-      setError("Invalid User ID or Password")
-      toast.error("Sign in failed. Check credentials.")
+    if (isRegisterMode) {
+      if (!fullName || !email || !password || !phone || !deptName || !deptCode) {
+        setError("All fields are required for HOD registration")
+        return
+      }
+      if (!email.endsWith("@mits.ac.in")) {
+        setError("Email must end with @mits.ac.in")
+        return
+      }
+      setIsLoading(true)
+      const res = await registerHOD(email, password, fullName, phone, deptName, deptCode)
+      setIsLoading(false)
+      if (res.success) {
+        toast.success(res.message)
+      } else {
+        setError(res.message)
+        toast.error(res.message)
+      }
     } else {
-      toast.success("Signed in successfully!")
+      if (!userId || !password) {
+        setError("Please fill in all fields")
+        return
+      }
+
+      setIsLoading(true)
+      await new Promise((resolve) => setTimeout(resolve, 800))
+
+      const success = await login(userId, password, undefined as any)
+      if (!success) {
+        setError("Invalid User ID or Password")
+        toast.error("Sign in failed. Check credentials.")
+      } else {
+        toast.success("Signed in successfully!")
+      }
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }
 
   return (
@@ -66,67 +95,161 @@ export function LoginPage() {
 
         <Card className="border-border/60 bg-card/90 shadow-xl shadow-black/5 backdrop-blur-sm rounded-2xl">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-lg font-black tracking-tight">Sign In</CardTitle>
+            <CardTitle className="text-lg font-black tracking-tight">
+              {isRegisterMode ? "HOD Registration" : "Sign In"}
+            </CardTitle>
             <CardDescription className="text-xs font-semibold text-muted-foreground">
-              Auto-detects HOD, Faculty, CR, or LR workspaces
+              {isRegisterMode 
+                ? "Setup a new HOD profile & department" 
+                : "Auto-detects HOD, Faculty, CR, or LR workspaces"}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <FieldGroup className="space-y-3.5">
-                <Field>
-                  <FieldLabel htmlFor="userId">User ID / Username</FieldLabel>
-                  <Input
-                    id="userId"
-                    type="text"
-                    placeholder="e.g. III-CSE-A-CR or CSE-HOD or dr-kumar"
-                    value={userId}
-                    onChange={(e) => setUserId(e.target.value)}
-                    className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
-                  />
-                </Field>
+                {!isRegisterMode ? (
+                  <>
+                    <Field>
+                      <FieldLabel htmlFor="userId">User ID / Username</FieldLabel>
+                      <Input
+                        id="userId"
+                        type="text"
+                        placeholder="e.g. III-CSE-A-CR or CSE-HOD or dr-kumar"
+                        value={userId}
+                        onChange={(e) => setUserId(e.target.value)}
+                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
+                      />
+                    </Field>
 
-                <Field>
-                  <FieldLabel htmlFor="password">Password</FieldLabel>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="bg-input/40 pr-10 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </Field>
+                    <Field>
+                      <FieldLabel htmlFor="password">Password</FieldLabel>
+                      <div className="relative">
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="bg-input/40 pr-10 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </Field>
+                  </>
+                ) : (
+                  <>
+                    <Field>
+                      <FieldLabel htmlFor="fullName">HOD Full Name</FieldLabel>
+                      <Input
+                        id="fullName"
+                        type="text"
+                        placeholder="e.g. Dr. Ramesh Kumar"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
+                      />
+                    </Field>
+
+                    <Field>
+                      <FieldLabel htmlFor="email">College Email ID</FieldLabel>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="e.g. hod@mits.ac.in"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
+                      />
+                    </Field>
+
+                    <Field>
+                      <FieldLabel htmlFor="password">Account Password</FieldLabel>
+                      <div className="relative">
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="bg-input/40 pr-10 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </Field>
+
+                    <Field>
+                      <FieldLabel htmlFor="phone">Phone Number</FieldLabel>
+                      <Input
+                        id="phone"
+                        type="text"
+                        placeholder="e.g. 9876543210"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
+                      />
+                    </Field>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field>
+                        <FieldLabel htmlFor="deptCode">Dept Code</FieldLabel>
+                        <Input
+                          id="deptCode"
+                          type="text"
+                          placeholder="e.g. CSE"
+                          value={deptCode}
+                          onChange={(e) => setDeptCode(e.target.value)}
+                          className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
+                        />
+                      </Field>
+
+                      <Field>
+                        <FieldLabel htmlFor="deptName">Department Name</FieldLabel>
+                        <Input
+                          id="deptName"
+                          type="text"
+                          placeholder="e.g. Computer Science"
+                          value={deptName}
+                          onChange={(e) => setDeptName(e.target.value)}
+                          className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
+                        />
+                      </Field>
+                    </div>
+                  </>
+                )}
               </FieldGroup>
 
-              {/* Remember Me & Forgot Password Toggles */}
-              <div className="flex items-center justify-between text-xs font-bold pt-1.5 pb-1">
-                <label className="flex items-center gap-2 cursor-pointer text-muted-foreground select-none">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer"
-                  />
-                  <span>Remember Me</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => toast.info("Password resets must be requested via HOD Workspace.")}
-                  className="text-primary hover:underline"
-                >
-                  Forgot Password?
-                </button>
-              </div>
+              {!isRegisterMode && (
+                <div className="flex items-center justify-between text-xs font-bold pt-1.5 pb-1">
+                  <label className="flex items-center gap-2 cursor-pointer text-muted-foreground select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer"
+                    />
+                    <span>Remember Me</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => toast.info("Password resets must be requested via HOD Workspace.")}
+                    className="text-primary hover:underline"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+              )}
 
               {error && (
                 <p className="text-xs font-bold text-destructive animate-fade-in-up mt-1">{error}</p>
@@ -140,44 +263,60 @@ export function LoginPage() {
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">
                     <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Authenticating...
+                    {isRegisterMode ? "Registering..." : "Authenticating..."}
                   </span>
                 ) : (
-                  "SIGN IN"
+                  isRegisterMode ? "CREATE HOD ACCOUNT" : "SIGN IN"
                 )}
               </Button>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError("")
+                    setIsRegisterMode(!isRegisterMode)
+                  }}
+                  className="text-xs font-bold text-primary hover:underline"
+                >
+                  {isRegisterMode ? "Back to Sign In" : "Need to set up the HOD account? Register here"}
+                </button>
+              </div>
             </form>
           </CardContent>
         </Card>
 
         {/* Demo Hints Footer */}
-        <div className="mt-5 rounded-2xl border border-border bg-card/65 p-4 backdrop-blur-sm space-y-2">
-          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground text-center">
-            Demo Credentials (Auto-Role detection)
-          </p>
-          <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-muted-foreground/80">
-            <div className="flex items-center gap-1.5 bg-secondary/30 p-2 rounded-lg">
-              <span className="text-primary">💼 HOD:</span>
-              <code className="text-foreground">CSE-HOD</code>
+        {!isRegisterMode && (
+          <div className="mt-5 rounded-2xl border border-border bg-card/65 p-4 backdrop-blur-sm space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground text-center">
+              Demo Credentials (Auto-Role detection)
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-muted-foreground/80">
+              <div className="flex items-center gap-1.5 bg-secondary/30 p-2 rounded-lg">
+                <span className="text-primary">💼 HOD:</span>
+                <code className="text-foreground">CSE-HOD</code>
+              </div>
+              <div className="flex items-center gap-1.5 bg-secondary/30 p-2 rounded-lg">
+                <span className="text-primary">🎓 CR:</span>
+                <code className="text-foreground">III-CSE-A-CR</code>
+              </div>
+              <div className="flex items-center gap-1.5 bg-secondary/30 p-2 rounded-lg">
+                <span className="text-primary">👩‍🎓 LR:</span>
+                <code className="text-foreground">III-CSE-A-LR</code>
+              </div>
+              <div className="flex items-center gap-1.5 bg-secondary/30 p-2 rounded-lg">
+                <span className="text-primary">🏫 Faculty:</span>
+                <code className="text-foreground">dr-kumar</code>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 bg-secondary/30 p-2 rounded-lg">
-              <span className="text-primary">🎓 CR:</span>
-              <code className="text-foreground">III-CSE-A-CR</code>
-            </div>
-            <div className="flex items-center gap-1.5 bg-secondary/30 p-2 rounded-lg">
-              <span className="text-primary">👩‍🎓 LR:</span>
-              <code className="text-foreground">III-CSE-A-LR</code>
-            </div>
-            <div className="flex items-center gap-1.5 bg-secondary/30 p-2 rounded-lg">
-              <span className="text-primary">🏫 Faculty:</span>
-              <code className="text-foreground">dr-kumar</code>
-            </div>
+            <p className="text-[9px] text-muted-foreground/60 text-center font-semibold italic mt-1">
+              *Use any non-empty string for password.
+            </p>
           </div>
-          <p className="text-[9px] text-muted-foreground/60 text-center font-semibold italic mt-1">
-            *Use any non-empty string for password.
-          </p>
-        </div>
+        )}
       </div>
     </div>
   )
 }
+

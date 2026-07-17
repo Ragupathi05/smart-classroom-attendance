@@ -629,5 +629,50 @@ export const SupabaseService = {
       console.error("Supabase promotion error:", err)
       return { success: false }
     }
+  },
+
+  async fetchAllStudents(): Promise<Student[]> {
+    try {
+      const { data, error } = await supabase
+        .from("students")
+        .select("*")
+        .eq("is_active", true)
+
+      if (error) throw error
+      return (data || []).map(s => ({
+        id: s.id,
+        rollNumber: s.roll_number,
+        name: s.full_name,
+        gender: s.gender as any,
+        mobileNumber: s.phone || "",
+        status: "present"
+      }))
+    } catch (err) {
+      console.error("Error fetching all students:", err)
+      return []
+    }
+  },
+
+  async fetchAllEnrollments(): Promise<StudentSectionAssignment[]> {
+    try {
+      const { data, error } = await supabase
+        .from("student_section_assignments")
+        .select("*")
+        .eq("is_active", true)
+
+      if (error) throw error
+      return (data || []).map(e => ({
+        id: e.id,
+        studentId: e.student_id,
+        sectionId: e.section_id,
+        academicSessionId: e.academic_session_id,
+        status: "Active",
+        joinedOn: e.assigned_at ? new Date(e.assigned_at).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]
+      }))
+    } catch (err) {
+      console.error("Error fetching enrollments:", err)
+      return []
+    }
   }
 }
+

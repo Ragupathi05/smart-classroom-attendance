@@ -137,11 +137,8 @@ const getSeedAttendanceRecords = (): AttendanceRecord[] => {
 }
 
 const getLegacyAttendanceState = () => {
-  let records = AttendanceService.loadRecords()
-  if (records.length === 0) {
-    records = getSeedAttendanceRecords()
-  }
-  const defaultStudents = StudentService.getSeedStudents()
+  const records: AttendanceRecord[] = []
+  const defaultStudents: Student[] = []
   if (typeof window === "undefined") return { attendanceRecords: records, students: defaultStudents, correctionRequests: [], attendanceDrafts: {} }
   try {
     const raw = localStorage.getItem("attendance-app-store-v1")

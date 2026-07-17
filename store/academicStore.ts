@@ -233,21 +233,20 @@ const mockCrlrHistory: CRLRAssignmentHistoryEntry[] = [
 export const useAcademicStore = create<AcademicState>()(
   persist(
     (set, get) => ({
-      batches: mockBatches,
-      programs: mockPrograms,
-      sections: mockSections,
-      facultyList: mockFaculty,
-      activities: mockActivities,
-      notifications: mockNotifications,
-      selectedSectionWorkspace: "sec-1", // default workspace is set to sec-1
-      currentBatchId: "batch-1",
-      viewingBatchId: "batch-1",
-      academicSessions: [
-        { id: "session-2026-2027", name: "2026-2027", status: "ACTIVE" }
-      ],
-      currentSessionId: "session-2026-2027",
-      enrollments: getInitialEnrollments(),
-      crlrAssignmentHistory: mockCrlrHistory,
+      batches: [],
+      programs: [],
+      sections: [],
+      facultyList: [],
+      activities: [],
+      notifications: [],
+      selectedSectionWorkspace: null,
+      currentBatchId: "",
+      viewingBatchId: "",
+      academicSessions: [],
+      currentSessionId: "",
+      enrollments: [],
+      crlrAssignmentHistory: [],
+
 
       setSelectedSectionWorkspace: (sectionId) => set({ selectedSectionWorkspace: sectionId }),
       
@@ -799,16 +798,17 @@ export const useAcademicStore = create<AcademicState>()(
           const programs = await SupabaseService.fetchPrograms()
           const sections = await SupabaseService.fetchSections(deptId)
           const facultyList = await SupabaseService.fetchFaculty(deptId)
+          
+          // Fetch student roster and assignments
+          const students = await SupabaseService.fetchAllStudents()
+          const enrollments = await SupabaseService.fetchAllEnrollments()
 
-          const nextState: any = {}
-          if (sessions.length > 0) {
-            nextState.academicSessions = sessions
-            if (activeSession) {
-              nextState.currentSessionId = activeSession.id
-            }
-          }
-          if (programs.length > 0) {
-            nextState.batches = programs.map((p: any) => {
+          // Sync studentStore
+          useStudentStore.setState({ classStudents: students })
+
+          const nextState: any = {
+            academicSessions: sessions,
+            batches: programs.map((p: any) => {
               const match = get().batches.find((b: any) => b.id === p.id || b.name === p.name)
               return {
                 id: p.id,
@@ -819,18 +819,26 @@ export const useAcademicStore = create<AcademicState>()(
                 currentSemester: match?.currentSemester || "Odd",
                 status: match?.status || "ACTIVE"
               }
-            })
-          }
-          if (sections.length > 0) {
-            nextState.sections = sections
-          }
-          if (facultyList.length > 0) {
-            nextState.facultyList = facultyList
+            }),
+            sections: sections,
+            facultyList: facultyList,
+            enrollments: enrollments
           }
 
-          if (Object.keys(nextState).length > 0) {
-            set(nextState)
+          if (activeSession) {
+            nextState.currentSessionId = activeSession.id
+          } else if (sessions.length > 0) {
+            nextState.currentSessionId = sessions[0].id
+          } else {
+            nextState.currentSessionId = ""
           }
+
+          // Automatically set selected section if null
+          if (!get().selectedSectionWorkspace && sections.length > 0) {
+            nextState.selectedSectionWorkspace = sections[0].id
+          }
+
+          set(nextState)
         } catch (err) {
           console.error("Failed to sync with Supabase:", err)
         }

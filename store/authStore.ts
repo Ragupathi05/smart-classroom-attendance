@@ -4,6 +4,8 @@ import type { User, UserRole } from "@/types"
 import { AuthService } from "@/services"
 import { useSharedStore } from "./sharedStore"
 import { useTimetableStore } from "./timetableStore"
+import { supabase } from "@/lib/supabase/client"
+
 
 interface AuthState {
   user: User | null
@@ -11,7 +13,7 @@ interface AuthState {
   userPasswords: Record<string, string>
   sessionLoginTime?: number
   lastActivityTime?: number
-  login: (userId: string, password: string, role: UserRole) => Promise<boolean>
+  login: (userId: string, password: string, role?: UserRole) => Promise<boolean>
   logout: () => void
   changeUserPassword: (userId: string, current: string, newPass: string) => { success: boolean; message: string }
   resetUserPassword: (userId: string, role: UserRole) => void
@@ -24,6 +26,14 @@ interface AuthState {
     phone?: string
     mentor?: string
   }) => { success: boolean; message: string }
+  registerHOD: (
+    email: string,
+    password: string,
+    fullName: string,
+    phone: string,
+    deptName: string,
+    deptCode: string
+  ) => Promise<{ success: boolean; message: string }>
 }
 
 const getLegacyAuthState = () => {
@@ -57,9 +67,72 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (userId, password, role) => {
         if (!userId || !password) return false
-        let detectedRole = role
         const lower = userId.toLowerCase()
 
+        // 1. Try Supabase Auth first (for HOD / Faculty)
+        if (lower.includes("@")) {
+          try {
+            const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+              email: userId.trim(),
+              password: password
+            })
+
+            if (!authErr && authData.user) {
+              // Fetch profile from public.users
+              const { data: profile, error: profErr } = await supabase
+                .from("users")
+                .select(`
+                  id,
+                  full_name,
+                  email,
+                  phone,
+                  role,
+                  departments (
+                    id,
+                    name,
+                    code
+                  )
+                `)
+                .eq("id", authData.user.id)
+                .single()
+
+              if (!profErr && profile) {
+                const mappedUser: User = {
+                  id: profile.id,
+                  name: profile.full_name,
+                  role: (profile.role.toLowerCase() === "hod" ? "hod" : "faculty") as UserRole,
+                  email: profile.email,
+                  department: (profile.departments as any)?.name || "Computer Science & Engineering",
+                  phone: profile.phone || "",
+                  className: "",
+                  year: "",
+                  section: "",
+                  mentor: "",
+                }
+
+                set({
+                  user: mappedUser,
+                  isAuthenticated: true,
+                  sessionLoginTime: Date.now(),
+                  lastActivityTime: Date.now()
+                })
+                useSharedStore.getState().setCurrentPage("dashboard")
+                useTimetableStore.getState().setSelectedCell(null)
+                
+                // Trigger academic sync
+                const { useAcademicStore } = require("@/store")
+                useAcademicStore.getState().syncWithSupabase().catch(console.error)
+
+                return true
+              }
+            }
+          } catch (e) {
+            console.warn("Supabase Auth sign-in failed, trying fallback:", e)
+          }
+        }
+
+        // 2. Fallback to Local Auth (CR/LR and Local HOD/Faculty test credentials)
+        let detectedRole = role
         if (!detectedRole) {
           if (lower.includes("hod")) {
             detectedRole = "hod"
@@ -120,6 +193,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
+        supabase.auth.signOut().catch(console.error)
         set({
           user: null,
           isAuthenticated: false,
@@ -229,6 +303,80 @@ export const useAuthStore = create<AuthState>()(
 
         return { success: true, message: "Profile settings updated." }
       },
+
+      registerHOD: async (email, password, fullName, phone, deptName, deptCode) => {
+        try {
+          // 1. Sign up user in Supabase Auth
+          const { data: authData, error: authErr } = await supabase.auth.signUp({
+            email: email.trim().toLowerCase(),
+            password: password,
+          })
+
+          if (authErr) throw authErr
+          if (!authData.user) {
+            return { success: false, message: "Failed to create user login credentials." }
+          }
+
+          // 2. Create the department
+          const { data: deptData, error: deptErr } = await supabase
+            .from("departments")
+            .insert({
+              name: deptName.trim(),
+              code: deptCode.trim().toUpperCase(),
+              description: `${deptName} Department`
+            })
+            .select("id")
+            .single()
+
+          if (deptErr) throw deptErr
+
+          // 3. Create the profile in the public.users table
+          const { error: userErr } = await supabase
+            .from("users")
+            .insert({
+              id: authData.user.id,
+              full_name: fullName.trim(),
+              email: email.trim().toLowerCase(),
+              phone: phone.trim(),
+              faculty_code: `HOD-${deptCode.trim().toUpperCase()}`,
+              role: "HOD",
+              department_id: deptData.id,
+              is_active: true
+            })
+
+          if (userErr) throw userErr
+
+          // 4. Log in the newly registered HOD
+          const mappedUser: User = {
+            id: authData.user.id,
+            name: fullName.trim(),
+            role: "hod",
+            email: email.trim().toLowerCase(),
+            department: deptName.trim(),
+            phone: phone.trim(),
+            className: "",
+            year: "",
+            section: "",
+            mentor: "",
+          }
+
+          set({
+            user: mappedUser,
+            isAuthenticated: true,
+            sessionLoginTime: Date.now(),
+            lastActivityTime: Date.now()
+          })
+
+          useSharedStore.getState().setCurrentPage("dashboard")
+          useTimetableStore.getState().setSelectedCell(null)
+
+          return { success: true, message: "HOD account created and logged in!" }
+        } catch (err: any) {
+          console.error("HOD registration failed:", err)
+          return { success: false, message: err.message || "Failed to create HOD account." }
+        }
+      },
+
     }),
     {
       name: "attendance-auth-store",

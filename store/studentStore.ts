@@ -12,7 +12,7 @@ interface StudentState {
 }
 
 const getLegacyStudentState = () => {
-  const defaults = StudentService.getSeedStudents()
+  const defaults: Student[] = []
   if (typeof window === "undefined") return { classStudents: defaults }
   try {
     const raw = localStorage.getItem("attendance-app-store-v1")

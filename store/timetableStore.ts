@@ -75,9 +75,9 @@ const getInitialTimetables = (): Record<string, TimetableCell[]> => {
 export const useTimetableStore = create<TimetableState>()(
   persist(
     (set, get) => ({
-      timetables: getInitialTimetables(),
-      currentSectionFilter: "sec-1",
-      timetable: getInitialTimetables()["sec-1"],
+      timetables: {},
+      currentSectionFilter: "",
+      timetable: [],
       selectedCell: null,
       timetableWeekKey: getISOWeekKey(),
       specialDays: {},
