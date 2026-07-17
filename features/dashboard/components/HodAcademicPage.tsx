@@ -53,6 +53,9 @@ export function HodAcademicPage() {
     promoteBatch,
     currentSessionId,
     getSectionRoster,
+    academicSessions,
+    addAcademicSession,
+    setSessionActive,
   } = useAcademicStore()
 
   const { classStudents, addClassStudent, updateClassStudent, deleteClassStudent, importClassStudents } = useStudentStore()
@@ -98,8 +101,28 @@ export function HodAcademicPage() {
   }, [batches, viewingBatchId, setViewingBatchId])
 
   // Navigation tabs
-  const [activeTab, setActiveTab] = useState<"batches" | "programs" | "sections">("batches")
+  const [activeTab, setActiveTab] = useState<"batches" | "programs" | "sections" | "sessions">("batches")
   const [workspaceTab, setWorkspaceTab] = useState<"overview" | "students" | "faculty" | "timetable">("overview")
+
+  // Sessions settings
+  const [newSessionName, setNewSessionName] = useState("")
+
+  const handleCreateSessionClick = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newSessionName.trim()) return
+    if (!/^\d{4}-\d{4}$/.test(newSessionName.trim())) {
+      toast.error("Session name must be in the format YYYY-YYYY (e.g. 2026-2027)")
+      return
+    }
+    addAcademicSession(newSessionName.trim())
+    setNewSessionName("")
+    toast.success("Academic Session created successfully!")
+  }
+
+  const handleSetSessionActive = (id: string) => {
+    setSessionActive(id)
+    toast.success("Active Academic Session updated!")
+  }
 
   // Modals / forms states
   const [showAddBatch, setShowAddBatch] = useState(false)
@@ -954,6 +977,7 @@ export function HodAcademicPage() {
           {[
             { id: "batches", label: "Batches Hub", icon: Calendar },
             { id: "sections", label: "Section Folders", icon: Users },
+            { id: "sessions", label: "Sessions", icon: Sparkles },
           ].map((tab) => (
             <Button
               key={tab.id}
@@ -1210,6 +1234,79 @@ export function HodAcademicPage() {
               ))
             )}
           </div>
+        </div>
+      )}
+
+      {activeTab === "sessions" && (
+        <div className="space-y-6 animate-fade-in-up">
+          <Card className="border-border/60 shadow-sm rounded-2xl bg-card">
+            <CardHeader>
+              <CardTitle className="text-lg font-black text-foreground">Configure Academic Sessions</CardTitle>
+              <CardDescription className="text-xs font-semibold text-muted-foreground">
+                Define the academic years for the department. Batches and student cohorts are grouped under these sessions.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Add New Session Form */}
+              <form onSubmit={handleCreateSessionClick} className="flex flex-col sm:flex-row gap-3 items-end p-4 rounded-xl border bg-secondary/10">
+                <div className="flex-1 space-y-1.5 w-full">
+                  <label className="text-[10px] font-black uppercase text-muted-foreground tracking-wider">New Session Name</label>
+                  <Input 
+                    placeholder="e.g. 2026-2027" 
+                    value={newSessionName} 
+                    onChange={(e) => setNewSessionName(e.target.value)}
+                    className="h-9 text-xs font-semibold rounded-lg bg-background"
+                  />
+                </div>
+                <Button 
+                  type="submit"
+                  className="text-xs font-bold rounded-lg h-9 w-full sm:w-auto"
+                >
+                  Add Academic Session
+                </Button>
+              </form>
+
+              {/* Sessions List */}
+              <div className="border border-border/80 rounded-xl overflow-hidden divide-y">
+                {academicSessions.length === 0 ? (
+                  <div className="p-8 text-center text-xs font-semibold text-muted-foreground">
+                    No academic sessions configured yet. Create one above to get started.
+                  </div>
+                ) : (
+                  academicSessions.map((sess) => {
+                    const isActive = sess.id === currentSessionId || sess.status === "ACTIVE"
+                    return (
+                      <div key={sess.id} className="flex items-center justify-between p-4 bg-card hover:bg-secondary/5 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <span className={cn(
+                            "h-2 w-2 rounded-full",
+                            isActive ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/30"
+                          )} />
+                          <div>
+                            <p className="text-xs font-black text-foreground">{sess.name} Session</p>
+                            <p className="text-[10px] text-muted-foreground font-semibold">
+                              {isActive ? "Currently Active Session" : "Inactive Session"}
+                            </p>
+                          </div>
+                        </div>
+                        {!isActive && (
+                          <Button 
+                            type="button"
+                            onClick={() => handleSetSessionActive(sess.id)}
+                            variant="outline" 
+                            size="sm" 
+                            className="text-xs font-bold rounded-lg h-8 px-3"
+                          >
+                            Set Active
+                          </Button>
+                        )}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 

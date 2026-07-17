@@ -1,6 +1,6 @@
 :HL["/smart-classroom-attendance/_next/static/chunks/88ef45449bc91df9.css","style"]
-:HL["/smart-classroom-attendance/_next/static/chunks/80a1e902cdcd2b82.css","style"]
+:HL["/smart-classroom-attendance/_next/static/chunks/d35d179b10d3fbc7.css","style"]
 :HL["/smart-classroom-attendance/_next/static/media/797e433ab948586e-s.p.29207c2f.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
 :HL["/smart-classroom-attendance/_next/static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
 :HL["/smart-classroom-attendance/_next/static/chunks/45042b2edb02f2ea.css","style"]
-0:{"buildId":"RNHhNuRKF8obqnwajrp_I","tree":{"name":"","paramType":null,"paramKey":"","hasRuntimePrefetch":false,"slots":{"children":{"name":"__PAGE__","paramType":null,"paramKey":"__PAGE__","hasRuntimePrefetch":false,"slots":null,"isRootLayout":false}},"isRootLayout":true},"staleTime":300}
+0:{"buildId":"j5UxpOPT7JOYauBo_k-i9","tree":{"name":"","paramType":null,"paramKey":"","hasRuntimePrefetch":false,"slots":{"children":{"name":"__PAGE__","paramType":null,"paramKey":"__PAGE__","hasRuntimePrefetch":false,"slots":null,"isRootLayout":false}},"isRootLayout":true},"staleTime":300}
