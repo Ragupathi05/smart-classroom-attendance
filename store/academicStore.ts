@@ -297,10 +297,10 @@ export const useAcademicStore = create<AcademicState>()(
         facultyList: state.facultyList.filter((f) => f.id !== id)
       })),
 
-      assignCRLR: (sectionId, crName, lrName) => set((state) => {
-        const section = state.sections.find((s) => s.id === sectionId)
+      assignCRLR: async (sectionId, crName, lrName) => {
+        const section = get().sections.find((s) => s.id === sectionId)
         
-        const newHistory = [...state.crlrAssignmentHistory]
+        const newHistory = [...get().crlrAssignmentHistory]
         const todayStr = new Date().toISOString().split("T")[0]
 
         if (section) {
@@ -324,17 +324,14 @@ export const useAcademicStore = create<AcademicState>()(
           }
         }
 
-        // Persist local CR/LR assignments in localStorage
-        if (typeof window !== "undefined") {
-          localStorage.setItem(`crlr-assign-${sectionId}`, JSON.stringify({ crName, lrName }))
-        }
+
 
         // Persist database CR/LR assignments in Supabase
-        const activeSessionId = state.currentSessionId
+        const activeSessionId = section?.academicSessionId || get().currentSessionId
         const SupabaseService = require("@/services/SupabaseService").SupabaseService
-        SupabaseService.assignCRLRInSupabase(sectionId, crName, lrName, activeSessionId).catch(console.error)
+        await SupabaseService.assignCRLRInSupabase(sectionId, crName, lrName, activeSessionId).catch(console.error)
 
-        return {
+        set((state) => ({
           sections: state.sections.map((s) => 
             s.id === sectionId ? { ...s, crName, lrName } : s
           ),
@@ -343,8 +340,8 @@ export const useAcademicStore = create<AcademicState>()(
             { id: `act-${Date.now()}`, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), date: "Today", type: "CR/LR Assigned", detail: `CR/LR changed for ${section?.name || "Section"}.` },
             ...state.activities
           ]
-        }
-      }),
+        }))
+      },
 
       addActivity: (type, detail) => set((state) => ({
         activities: [
@@ -811,16 +808,7 @@ export const useAcademicStore = create<AcademicState>()(
             batches: updatedBatches,
             viewingBatchId: updatedViewingBatchId,
             currentBatchId: updatedCurrentBatchId,
-            sections: sections.map((s: any) => {
-              if (typeof window !== "undefined") {
-                const localAssigned = localStorage.getItem(`crlr-assign-${s.id}`)
-                if (localAssigned) {
-                  const { crName, lrName } = JSON.parse(localAssigned)
-                  return { ...s, crName: crName || s.crName, lrName: lrName || s.lrName }
-                }
-              }
-              return s
-            }),
+            sections: sections,
             facultyList: facultyList,
             enrollments: enrollments
           }
