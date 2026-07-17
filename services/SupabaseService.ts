@@ -322,12 +322,14 @@ export const SupabaseService = {
   async assignCRLRInSupabase(sectionId: string, crName: string, lrName: string, sessionId: string): Promise<boolean> {
     try {
       // 1. Reset existing CR/LR roles for this section and session
-      await supabase
+      const { error: resetErr } = await supabase
         .from("student_section_assignments")
         .update({ roll_no_in_class: null })
         .eq("section_id", sectionId)
         .eq("academic_session_id", sessionId)
         .in("roll_no_in_class", ["CR", "LR"])
+      
+      if (resetErr) console.warn("CR/LR reset warning:", resetErr.message)
 
       // 2. Find the student who is assigned as CR
       if (crName && crName !== "To be assigned" && crName !== "Unassigned") {
@@ -339,12 +341,16 @@ export const SupabaseService = {
           .maybeSingle()
 
         if (crStud) {
-          await supabase
+          const { error: crErr } = await supabase
             .from("student_section_assignments")
             .update({ roll_no_in_class: "CR" })
             .eq("student_id", crStud.id)
             .eq("section_id", sectionId)
             .eq("academic_session_id", sessionId)
+          
+          if (crErr) console.error("CR assign error:", crErr.message)
+        } else {
+          console.warn("CR student not found in students table:", crName)
         }
       }
 
@@ -358,12 +364,16 @@ export const SupabaseService = {
           .maybeSingle()
 
         if (lrStud) {
-          await supabase
+          const { error: lrErr } = await supabase
             .from("student_section_assignments")
             .update({ roll_no_in_class: "LR" })
             .eq("student_id", lrStud.id)
             .eq("section_id", sectionId)
             .eq("academic_session_id", sessionId)
+          
+          if (lrErr) console.error("LR assign error:", lrErr.message)
+        } else {
+          console.warn("LR student not found in students table:", lrName)
         }
       }
 
