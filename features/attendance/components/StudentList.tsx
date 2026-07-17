@@ -25,6 +25,8 @@ export function StudentList({ readOnly = false }: StudentListProps) {
     return student.status === filter
   })
 
+  const sortedStudents = [...filteredStudents].sort((a, b) => a.rollNumber.localeCompare(b.rollNumber))
+
   const statusOptions: { value: AttendanceStatus; label: string; color: string }[] = [
     { value: "present", label: "Present", color: "text-green-600" },
     { value: "permission", label: "Permission", color: "text-warning" },
@@ -87,7 +89,7 @@ export function StudentList({ readOnly = false }: StudentListProps) {
           </div>
 
           {/* Student Rows */}
-          {filteredStudents.map((student, index) => (
+          {sortedStudents.map((student, index) => (
             <div
               key={student.id}
               className={cn(

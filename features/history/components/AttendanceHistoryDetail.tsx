@@ -153,7 +153,7 @@ export function AttendanceHistoryDetail({
               </div>
 
               {/* Student Rows */}
-              {draftStudents.map((student, index) => (
+              {[...draftStudents].sort((a, b) => a.rollNumber.localeCompare(b.rollNumber)).map((student, index) => (
                 <div
                   key={student.id}
                   className={cn(
