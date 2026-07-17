@@ -743,39 +743,78 @@ export const useAcademicStore = create<AcademicState>()(
           // Sync studentStore
           useStudentStore.setState({ classStudents: students })
 
+           const updatedBatches = programs.map((p: any) => {
+            const match = get().batches.find((b: any) => {
+              const normL = b.name.toLowerCase().replace(/\s+/g, "").replace(/-/g, "")
+              const normP = p.name.toLowerCase().replace(/\s+/g, "").replace(/-/g, "")
+              return b.id === p.id || normL === normP
+            })
+            return {
+              id: p.id,
+              name: p.name,
+              startYear: match?.startYear || 2023,
+              endYear: match?.endYear || 2027,
+              currentYearLevel: match?.currentYearLevel || "3rd Year",
+              currentSemester: match?.currentSemester || "Odd",
+              status: match?.status || "ACTIVE"
+            }
+          })
+
+          let updatedViewingBatchId = get().viewingBatchId
+          let updatedCurrentBatchId = get().currentBatchId
+
+          const oldViewingBatch = get().batches.find((b: any) => b.id === get().viewingBatchId)
+          if (oldViewingBatch) {
+            const matchingNewBatch = updatedBatches.find((b: any) => {
+              const normOld = oldViewingBatch.name.toLowerCase().replace(/\s+/g, "").replace(/-/g, "")
+              const normNew = b.name.toLowerCase().replace(/\s+/g, "").replace(/-/g, "")
+              return normOld === normNew
+            })
+            if (matchingNewBatch) {
+              updatedViewingBatchId = matchingNewBatch.id
+            }
+          } else if (updatedBatches.length > 0) {
+            updatedViewingBatchId = updatedBatches[0].id
+          }
+
+          const oldCurrentBatch = get().batches.find((b: any) => b.id === get().currentBatchId)
+          if (oldCurrentBatch) {
+            const matchingNewBatch = updatedBatches.find((b: any) => {
+              const normOld = oldCurrentBatch.name.toLowerCase().replace(/\s+/g, "").replace(/-/g, "")
+              const normNew = b.name.toLowerCase().replace(/\s+/g, "").replace(/-/g, "")
+              return normOld === normNew
+            })
+            if (matchingNewBatch) {
+              updatedCurrentBatchId = matchingNewBatch.id
+            }
+          } else if (updatedBatches.length > 0) {
+            updatedCurrentBatchId = updatedBatches[0].id
+          }
+
           const nextState: any = {
             academicSessions: sessions,
-            batches: programs.map((p: any) => {
-              const match = get().batches.find((b: any) => b.id === p.id || b.name === p.name)
-              return {
-                id: p.id,
-                name: p.name,
-                startYear: match?.startYear || 2023,
-                endYear: match?.endYear || 2027,
-                currentYearLevel: match?.currentYearLevel || "3rd Year",
-                currentSemester: match?.currentSemester || "Odd",
-                status: match?.status || "ACTIVE"
-              }
-            }),
+            batches: updatedBatches,
+            viewingBatchId: updatedViewingBatchId,
+            currentBatchId: updatedCurrentBatchId,
             sections: sections,
             facultyList: facultyList,
             enrollments: enrollments
           }
-
-          if (activeSession) {
-            nextState.currentSessionId = activeSession.id
-          } else if (sessions.length > 0) {
-            nextState.currentSessionId = sessions[0].id
-          } else {
-            nextState.currentSessionId = ""
-          }
-
-          // Automatically set selected section if null
-          if (!get().selectedSectionWorkspace && sections.length > 0) {
-            nextState.selectedSectionWorkspace = sections[0].id
-          }
-
-          set(nextState)
+ 
+           if (activeSession) {
+             nextState.currentSessionId = activeSession.id
+           } else if (sessions.length > 0) {
+             nextState.currentSessionId = sessions[0].id
+           } else {
+             nextState.currentSessionId = ""
+           }
+ 
+           // Automatically set selected section if null
+           if (!get().selectedSectionWorkspace && sections.length > 0) {
+             nextState.selectedSectionWorkspace = sections[0].id
+           }
+ 
+           set(nextState)
         } catch (err) {
           console.error("Failed to sync with Supabase:", err)
         }

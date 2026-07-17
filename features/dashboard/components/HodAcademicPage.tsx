@@ -26,7 +26,7 @@ import {
   Lock,
   X,
 } from "lucide-react"
-import { useAcademicStore, useStudentStore, useTimetableStore, useConfirmStore } from "@/store"
+import { useAcademicStore, useStudentStore, useTimetableStore, useConfirmStore, useAttendanceStore } from "@/store"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -236,6 +236,27 @@ export function HodAcademicPage() {
   const activeSection = useMemo(() => {
     return sections.find((s) => s.id === selectedSectionWorkspace) || null
   }, [sections, selectedSectionWorkspace])
+
+  const attendanceRecords = useAttendanceStore((state) => state.attendanceRecords)
+
+  const overallAttendanceLabel = useMemo(() => {
+    if (!selectedSectionWorkspace) return "N/A"
+    const secRecords = attendanceRecords.filter(
+      (r) => r.sectionId === selectedSectionWorkspace && r.academicSessionId === currentSessionId
+    )
+    if (secRecords.length === 0) return "N/A"
+    
+    let totalPresent = 0
+    let totalStudentsCount = 0
+    secRecords.forEach((rec) => {
+      const presentCount = rec.students.filter((s: any) => s.status !== "absent").length
+      totalPresent += presentCount
+      totalStudentsCount += rec.students.length
+    })
+    
+    if (totalStudentsCount === 0) return "N/A"
+    return `${Math.round((totalPresent / totalStudentsCount) * 100)}%`
+  }, [attendanceRecords, selectedSectionWorkspace, currentSessionId])
 
   // Is viewing a completely graduated/archived batch?
   const isBatchArchived = useMemo(() => {
@@ -547,7 +568,7 @@ export function HodAcademicPage() {
             { label: "Total Students", value: selectedSectionWorkspace ? getSectionRoster(selectedSectionWorkspace).length : 0, icon: Users, cardClass: "stats-card-indigo", iconColor: "text-indigo-650 dark:text-indigo-400" },
             { label: "Assigned Faculty", value: assignedFaculty.length, icon: Layers, cardClass: "stats-card-indigo", iconColor: "text-indigo-650 dark:text-indigo-400" },
             { label: "Subjects taught", value: assignedFaculty.length > 0 ? Array.from(new Set(assignedFaculty.flatMap(f => f.subjects))).length : 0, icon: BookOpen, cardClass: "stats-card-amber", iconColor: "text-amber-600 dark:text-amber-400" },
-            { label: "Overall Attendance", value: "92%", icon: TrendingUp, cardClass: "stats-card-emerald", iconColor: "text-emerald-650 dark:text-emerald-400" },
+            { label: "Overall Attendance", value: overallAttendanceLabel, icon: TrendingUp, cardClass: "stats-card-emerald", iconColor: "text-emerald-650 dark:text-emerald-400" },
           ].map((stat) => (
             <div key={stat.label} className={cn("rounded-2xl p-4 flex items-center justify-between transition-all duration-300 hover:scale-[1.02] shadow-sm bg-card/65", stat.cardClass)}>
               <div className="space-y-0.5">
