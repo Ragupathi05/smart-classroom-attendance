@@ -324,6 +324,11 @@ export const useAcademicStore = create<AcademicState>()(
           }
         }
 
+        // Persist local CR/LR assignments in localStorage
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`crlr-assign-${sectionId}`, JSON.stringify({ crName, lrName }))
+        }
+
         return {
           sections: state.sections.map((s) => 
             s.id === sectionId ? { ...s, crName, lrName } : s
@@ -801,7 +806,16 @@ export const useAcademicStore = create<AcademicState>()(
             batches: updatedBatches,
             viewingBatchId: updatedViewingBatchId,
             currentBatchId: updatedCurrentBatchId,
-            sections: sections,
+            sections: sections.map((s: any) => {
+              if (typeof window !== "undefined") {
+                const localAssigned = localStorage.getItem(`crlr-assign-${s.id}`)
+                if (localAssigned) {
+                  const { crName, lrName } = JSON.parse(localAssigned)
+                  return { ...s, crName: crName || s.crName, lrName: lrName || s.lrName }
+                }
+              }
+              return s
+            }),
             facultyList: facultyList,
             enrollments: enrollments
           }
