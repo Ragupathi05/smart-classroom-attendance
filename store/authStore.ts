@@ -317,18 +317,33 @@ export const useAuthStore = create<AuthState>()(
             return { success: false, message: "Failed to create user login credentials." }
           }
 
-          // 2. Create the department
-          const { data: deptData, error: deptErr } = await supabase
+          // 2. Get or create the department
+          const codeUpper = deptCode.trim().toUpperCase()
+          const { data: existingDept } = await supabase
             .from("departments")
-            .insert({
-              name: deptName.trim(),
-              code: deptCode.trim().toUpperCase(),
-              description: `${deptName} Department`
-            })
             .select("id")
-            .single()
+            .eq("code", codeUpper)
+            .maybeSingle()
 
-          if (deptErr) throw deptErr
+          let deptId: string
+          if (existingDept?.id) {
+            // Department already exists — reuse it
+            deptId = existingDept.id
+          } else {
+            // Create a new department
+            const { data: newDept, error: deptErr } = await supabase
+              .from("departments")
+              .insert({
+                name: deptName.trim(),
+                code: codeUpper,
+                description: `${deptName} Department`
+              })
+              .select("id")
+              .single()
+            if (deptErr) throw deptErr
+            deptId = newDept.id
+          }
+
 
           // 3. Create the profile in the public.users table
           const { error: userErr } = await supabase
@@ -340,7 +355,7 @@ export const useAuthStore = create<AuthState>()(
               phone: phone.trim(),
               faculty_code: `HOD-${deptCode.trim().toUpperCase()}`,
               role: "HOD",
-              department_id: deptData.id,
+              department_id: deptId,
               is_active: true
             })
 
