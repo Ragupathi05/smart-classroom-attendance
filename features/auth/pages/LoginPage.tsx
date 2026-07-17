@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { GraduationCap, Eye, EyeOff, Users, BookOpen, Shield } from "lucide-react"
+import { GraduationCap, Eye, EyeOff, Shield, Mail, KeyRound, ArrowLeft } from "lucide-react"
 import { useAuthStore } from "@/store"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,16 +8,19 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { toast } from "react-toastify"
 import { supabase } from "@/lib/supabase/client"
 
+// Page modes
+type Mode = "login" | "register" | "forgot" | "reset"
+
 export function LoginPage() {
+  const [mode, setMode] = useState<Mode>("login")
+
+  // Login
   const [userId, setUserId] = useState("")
   const [password, setPassword] = useState("")
-  const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  
-  // Registration specific states
-  const [isRegisterMode, setIsRegisterMode] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
+
+  // Registration
   const [canRegisterHOD, setCanRegisterHOD] = useState(false)
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
@@ -26,14 +29,35 @@ export function LoginPage() {
   const [deptCode, setDeptCode] = useState("")
   const [setupCode, setSetupCode] = useState("")
 
+  // Forgot password
+  const [forgotEmail, setForgotEmail] = useState("")
+  const [forgotSent, setForgotSent] = useState(false)
+
+  // Reset password (after clicking email link)
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showNewPassword, setShowNewPassword] = useState(false)
+
+  const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+
   // Secret code baked in at build time from GitHub Secret
   const HOD_SETUP_CODE = process.env.NEXT_PUBLIC_HOD_SETUP_CODE || ""
-
 
   const login = useAuthStore((state) => state.login)
   const registerHOD = useAuthStore((state) => state.registerHOD)
 
-  // Query Supabase on mount to see if an HOD account has already been bootstrapped
+  // Detect password recovery token in URL hash (from Supabase reset email link)
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash && hash.includes("type=recovery")) {
+      setMode("reset")
+      // Clean the hash from the URL without reloading
+      window.history.replaceState(null, "", window.location.pathname)
+    }
+  }, [])
+
+  // Check if any HOD exists in DB → show/hide register link
   useEffect(() => {
     async function checkHODs() {
       try {
@@ -41,11 +65,7 @@ export function LoginPage() {
           .from("users")
           .select("id", { count: "exact", head: true })
           .eq("role", "HOD")
-        
-        if (!error) {
-          // If no HOD exists, allow registration. If one exists, block registration.
-          setCanRegisterHOD(count === 0)
-        }
+        if (!error) setCanRegisterHOD(count === 0)
       } catch (err) {
         console.error("Failed to check existing HOD accounts:", err)
       }
@@ -53,60 +73,113 @@ export function LoginPage() {
     checkHODs()
   }, [])
 
+  const clearError = () => setError("")
+
+  // ─── SUBMIT HANDLER ────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError("")
+    clearError()
 
-    if (isRegisterMode) {
-      if (!canRegisterHOD) {
-        setError("An HOD account has already been configured. Registration is locked.")
-        return
+    // ── LOGIN ──
+    if (mode === "login") {
+      if (!userId || !password) { setError("Please fill in all fields"); return }
+      setIsLoading(true)
+      await new Promise((r) => setTimeout(r, 600))
+      const success = await login(userId, password, undefined as any)
+      setIsLoading(false)
+      if (!success) {
+        setError("Invalid credentials. HOD/Faculty use email. CR/LR use RollNo-CR / RollNo-LR.")
+        toast.error("Sign in failed. Check your credentials.")
+      } else {
+        toast.success("Signed in successfully!")
       }
-      // Verify the secret setup code
+      return
+    }
+
+    // ── REGISTER HOD ──
+    if (mode === "register") {
+      if (!canRegisterHOD) { setError("HOD account already exists. Registration is locked."); return }
       if (HOD_SETUP_CODE && setupCode.trim() !== HOD_SETUP_CODE) {
-        setError("Invalid Institution Setup Code. Contact your system administrator.")
+        setError("Invalid Institution Setup Code. Contact your IT administrator.")
         return
       }
       if (!fullName || !email || !password || !phone || !deptName || !deptCode) {
-        setError("All fields are required for HOD registration")
+        setError("All fields are required")
         return
       }
       if (!email.endsWith("@mits.ac.in")) {
-        setError("Email must end with @mits.ac.in")
+        setError("Email must be a college email ending with @mits.ac.in")
         return
       }
       setIsLoading(true)
       const res = await registerHOD(email, password, fullName, phone, deptName, deptCode)
       setIsLoading(false)
-      if (res.success) {
-        toast.success(res.message)
-      } else {
-        setError(res.message)
-        toast.error(res.message)
-      }
-    } else {
-      if (!userId || !password) {
-        setError("Please fill in all fields")
-        return
-      }
+      if (res.success) toast.success(res.message)
+      else { setError(res.message); toast.error(res.message) }
+      return
+    }
 
+    // ── FORGOT PASSWORD ──
+    if (mode === "forgot") {
+      if (!forgotEmail) { setError("Please enter your email address"); return }
+      if (!forgotEmail.includes("@")) { setError("Please enter a valid email address"); return }
       setIsLoading(true)
-      await new Promise((resolve) => setTimeout(resolve, 800))
-
-      const success = await login(userId, password, undefined as any)
-      if (!success) {
-        setError("Invalid User ID or Password")
-        toast.error("Sign in failed. Check credentials.")
-      } else {
-        toast.success("Signed in successfully!")
-      }
+      const redirectTo =
+        typeof window !== "undefined"
+          ? `${window.location.origin}${window.location.pathname}`
+          : "https://ragupathi05.github.io/smart-classroom-attendance/"
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(forgotEmail.trim().toLowerCase(), {
+        redirectTo,
+      })
       setIsLoading(false)
+      if (resetErr) {
+        setError(resetErr.message)
+      } else {
+        setForgotSent(true)
+        toast.success("Password reset email sent! Check your inbox.")
+      }
+      return
+    }
+
+    // ── RESET PASSWORD (after clicking email link) ──
+    if (mode === "reset") {
+      if (!newPassword || !confirmPassword) { setError("Please fill in both fields"); return }
+      if (newPassword.length < 6) { setError("Password must be at least 6 characters"); return }
+      if (newPassword !== confirmPassword) { setError("Passwords do not match"); return }
+      setIsLoading(true)
+      const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword })
+      setIsLoading(false)
+      if (updateErr) {
+        setError(updateErr.message)
+        toast.error("Password reset failed: " + updateErr.message)
+      } else {
+        toast.success("Password updated successfully! Please sign in with your new password.")
+        setMode("login")
+        setNewPassword("")
+        setConfirmPassword("")
+      }
+      return
     }
   }
 
+  // ─── CARD TITLE / DESCRIPTION ──────────────────────────────────
+  const cardTitle = {
+    login: "Sign In",
+    register: "HOD Registration",
+    forgot: "Forgot Password",
+    reset: "Set New Password",
+  }[mode]
+
+  const cardDesc = {
+    login: "Enter your registered credentials to sign in",
+    register: "Setup a new HOD profile & department",
+    forgot: "Enter your college email to receive a password reset link",
+    reset: "Choose a new password for your account",
+  }[mode]
+
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
-      {/* Background Soft Glows */}
+      {/* Background Glows */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-32 -top-32 h-64 w-64 rounded-full bg-primary/8 blur-3xl" />
         <div className="absolute -bottom-32 -right-32 h-64 w-64 rounded-full bg-primary/5 blur-3xl" />
@@ -114,7 +187,7 @@ export function LoginPage() {
       </div>
 
       <div className="relative z-10 w-full max-w-md animate-fade-in-up">
-        {/* logo and Institution Title */}
+        {/* Logo */}
         <div className="mb-6 text-center">
           <div className="mx-auto mb-3.5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/10 transition-transform duration-300 hover:scale-105">
             <GraduationCap className="h-7 w-7 text-primary-foreground" />
@@ -129,32 +202,28 @@ export function LoginPage() {
 
         <Card className="border-border/60 bg-card/90 shadow-xl shadow-black/5 backdrop-blur-sm rounded-2xl">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-lg font-black tracking-tight">
-              {isRegisterMode ? "HOD Registration" : "Sign In"}
-            </CardTitle>
-            <CardDescription className="text-xs font-semibold text-muted-foreground">
-              {isRegisterMode 
-                ? "Setup a new HOD profile & department" 
-                : "Enter your registered credentials to sign in"}
-            </CardDescription>
+            <CardTitle className="text-lg font-black tracking-tight">{cardTitle}</CardTitle>
+            <CardDescription className="text-xs font-semibold text-muted-foreground">{cardDesc}</CardDescription>
           </CardHeader>
+
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <FieldGroup className="space-y-3.5">
-                {!isRegisterMode ? (
+
+                {/* ── LOGIN FORM ── */}
+                {mode === "login" && (
                   <>
                     <Field>
                       <FieldLabel htmlFor="userId">Username / Email</FieldLabel>
                       <Input
                         id="userId"
                         type="text"
-                        placeholder="e.g. hod@mits.ac.in or III-CSE-A-CR"
+                        placeholder="e.g. hod@mits.ac.in or 21CSE001-CR"
                         value={userId}
                         onChange={(e) => setUserId(e.target.value)}
                         className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
                       />
                     </Field>
-
                     <Field>
                       <FieldLabel htmlFor="password">Password</FieldLabel>
                       <div className="relative">
@@ -166,174 +235,208 @@ export function LoginPage() {
                           onChange={(e) => setPassword(e.target.value)}
                           className="bg-input/40 pr-10 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                        >
+                        <button type="button" onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
                     </Field>
                   </>
-                ) : (
+                )}
+
+                {/* ── REGISTER FORM ── */}
+                {mode === "register" && (
                   <>
                     <Field>
                       <FieldLabel htmlFor="fullName">HOD Full Name</FieldLabel>
-                      <Input
-                        id="fullName"
-                        type="text"
-                        placeholder="e.g. Dr. Ramesh Kumar"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
-                      />
+                      <Input id="fullName" type="text" placeholder="e.g. Dr. Ramesh Kumar"
+                        value={fullName} onChange={(e) => setFullName(e.target.value)}
+                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg" />
                     </Field>
-
                     <Field>
                       <FieldLabel htmlFor="email">College Email ID</FieldLabel>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="e.g. hod@mits.ac.in"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
-                      />
+                      <Input id="email" type="email" placeholder="e.g. hod@mits.ac.in"
+                        value={email} onChange={(e) => setEmail(e.target.value)}
+                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg" />
                     </Field>
-
                     <Field>
-                      <FieldLabel htmlFor="password">Account Password</FieldLabel>
+                      <FieldLabel htmlFor="regPassword">Account Password</FieldLabel>
                       <div className="relative">
-                        <Input
-                          id="password"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="••••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="bg-input/40 pr-10 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                        >
+                        <Input id="regPassword" type={showPassword ? "text" : "password"} placeholder="Min. 6 characters"
+                          value={password} onChange={(e) => setPassword(e.target.value)}
+                          className="bg-input/40 pr-10 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg" />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
                     </Field>
-
                     <Field>
                       <FieldLabel htmlFor="phone">Phone Number</FieldLabel>
-                      <Input
-                        id="phone"
-                        type="text"
-                        placeholder="e.g. 9876543210"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
-                      />
+                      <Input id="phone" type="text" placeholder="e.g. 9876543210"
+                        value={phone} onChange={(e) => setPhone(e.target.value)}
+                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg" />
                     </Field>
-
                     <div className="grid grid-cols-2 gap-3">
                       <Field>
                         <FieldLabel htmlFor="deptCode">Dept Code</FieldLabel>
-                        <Input
-                          id="deptCode"
-                          type="text"
-                          placeholder="e.g. CSE"
-                          value={deptCode}
-                          onChange={(e) => setDeptCode(e.target.value)}
-                          className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
-                        />
+                        <Input id="deptCode" type="text" placeholder="e.g. CSE"
+                          value={deptCode} onChange={(e) => setDeptCode(e.target.value)}
+                          className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg" />
                       </Field>
-
                       <Field>
                         <FieldLabel htmlFor="deptName">Department Name</FieldLabel>
-                        <Input
-                          id="deptName"
-                          type="text"
-                          placeholder="e.g. Computer Science"
-                          value={deptName}
-                          onChange={(e) => setDeptName(e.target.value)}
-                          className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg"
-                        />
+                        <Input id="deptName" type="text" placeholder="e.g. Computer Science"
+                          value={deptName} onChange={(e) => setDeptName(e.target.value)}
+                          className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg" />
                       </Field>
                     </div>
-
                     <Field>
                       <FieldLabel htmlFor="setupCode" className="flex items-center gap-1.5">
                         <Shield className="h-3 w-3 text-amber-500" />
                         Institution Setup Code
                       </FieldLabel>
-                      <Input
-                        id="setupCode"
-                        type="password"
-                        placeholder="Enter the secret setup code"
-                        value={setupCode}
-                        onChange={(e) => setSetupCode(e.target.value)}
-                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg border-amber-500/30 focus:border-amber-500/60"
-                      />
-                      <p className="text-[10px] text-muted-foreground mt-1">This code was provided by your IT administrator at the time of deployment.</p>
+                      <Input id="setupCode" type="password" placeholder="Enter the secret setup code"
+                        value={setupCode} onChange={(e) => setSetupCode(e.target.value)}
+                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg border-amber-500/30 focus:border-amber-500/60" />
+                      <p className="text-[10px] text-muted-foreground mt-1">Provided by your IT administrator at deployment.</p>
                     </Field>
                   </>
                 )}
+
+                {/* ── FORGOT PASSWORD FORM ── */}
+                {mode === "forgot" && !forgotSent && (
+                  <Field>
+                    <FieldLabel htmlFor="forgotEmail" className="flex items-center gap-1.5">
+                      <Mail className="h-3 w-3 text-primary" />
+                      Your College Email
+                    </FieldLabel>
+                    <Input id="forgotEmail" type="email" placeholder="e.g. hod@mits.ac.in"
+                      value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)}
+                      className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg" />
+                  </Field>
+                )}
+
+                {/* ── FORGOT — EMAIL SENT CONFIRMATION ── */}
+                {mode === "forgot" && forgotSent && (
+                  <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-4 text-center space-y-2">
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10">
+                      <Mail className="h-5 w-5 text-green-500" />
+                    </div>
+                    <p className="text-sm font-black text-foreground">Check Your Inbox!</p>
+                    <p className="text-xs text-muted-foreground">
+                      A password reset link has been sent to <span className="font-bold text-foreground">{forgotEmail}</span>.
+                      Click the link in the email to set a new password.
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Didn't receive it? Check your spam folder. The link expires in 1 hour.
+                    </p>
+                  </div>
+                )}
+
+                {/* ── RESET PASSWORD FORM ── */}
+                {mode === "reset" && (
+                  <>
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 mb-1">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <KeyRound className="h-3 w-3 text-primary flex-shrink-0" />
+                        You clicked a password reset link. Enter your new password below.
+                      </p>
+                    </div>
+                    <Field>
+                      <FieldLabel htmlFor="newPassword">New Password</FieldLabel>
+                      <div className="relative">
+                        <Input id="newPassword" type={showNewPassword ? "text" : "password"}
+                          placeholder="Min. 6 characters"
+                          value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+                          className="bg-input/40 pr-10 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg" />
+                        <button type="button" onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="confirmPassword">Confirm New Password</FieldLabel>
+                      <Input id="confirmPassword" type="password" placeholder="Re-enter new password"
+                        value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg" />
+                    </Field>
+                  </>
+                )}
+
               </FieldGroup>
 
-              {!isRegisterMode && (
+              {/* Remember Me + Forgot link (login mode only) */}
+              {mode === "login" && (
                 <div className="flex items-center justify-between text-xs font-bold pt-1.5 pb-1">
                   <label className="flex items-center gap-2 cursor-pointer text-muted-foreground select-none">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
+                    <input type="checkbox" checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
-                      className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer"
-                    />
+                      className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer" />
                     <span>Remember Me</span>
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => toast.info("Password resets must be requested via HOD Workspace.")}
-                    className="text-primary hover:underline"
-                  >
+                  <button type="button"
+                    onClick={() => { clearError(); setForgotSent(false); setMode("forgot") }}
+                    className="text-primary hover:underline">
                     Forgot Password?
                   </button>
                 </div>
               )}
 
+              {/* Error */}
               {error && (
                 <p className="text-xs font-bold text-destructive animate-fade-in-up mt-1">{error}</p>
               )}
 
-              <Button
-                type="submit"
-                className="w-full font-black text-xs h-10 rounded-lg shadow-md shadow-primary/10 transition-all duration-200 hover:shadow-lg hover:shadow-primary/20"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    {isRegisterMode ? "Registering..." : "Authenticating..."}
-                  </span>
-                ) : (
-                  isRegisterMode ? "CREATE HOD ACCOUNT" : "SIGN IN"
-                )}
-              </Button>
-
-              {canRegisterHOD && (
-                <div className="text-center pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setError("")
-                      setIsRegisterMode(!isRegisterMode)
-                    }}
-                    className="text-xs font-bold text-primary hover:underline"
-                  >
-                    {isRegisterMode ? "Back to Sign In" : "Need to set up the HOD account? Register here"}
-                  </button>
-                </div>
+              {/* Submit Button */}
+              {!(mode === "forgot" && forgotSent) && (
+                <Button type="submit"
+                  className="w-full font-black text-xs h-10 rounded-lg shadow-md shadow-primary/10 transition-all duration-200 hover:shadow-lg hover:shadow-primary/20"
+                  disabled={isLoading}>
+                  {isLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      {{
+                        login: "Authenticating...",
+                        register: "Registering...",
+                        forgot: "Sending Email...",
+                        reset: "Updating Password...",
+                      }[mode]}
+                    </span>
+                  ) : (
+                    {
+                      login: "SIGN IN",
+                      register: "CREATE HOD ACCOUNT",
+                      forgot: "SEND RESET LINK",
+                      reset: "SET NEW PASSWORD",
+                    }[mode]
+                  )}
+                </Button>
               )}
+
+              {/* Bottom navigation links */}
+              <div className="space-y-2 text-center pt-1">
+                {/* Back to login */}
+                {(mode === "forgot" || mode === "register" || mode === "reset") && (
+                  <button type="button"
+                    onClick={() => { clearError(); setForgotSent(false); setMode("login") }}
+                    className="flex items-center justify-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground mx-auto transition-colors">
+                    <ArrowLeft className="h-3 w-3" />
+                    Back to Sign In
+                  </button>
+                )}
+
+                {/* Register link (only if no HOD exists yet) */}
+                {mode === "login" && canRegisterHOD && (
+                  <button type="button"
+                    onClick={() => { clearError(); setMode("register") }}
+                    className="text-xs font-bold text-primary hover:underline block w-full">
+                    Need to set up the HOD account? Register here
+                  </button>
+                )}
+              </div>
+
             </form>
           </CardContent>
         </Card>
@@ -341,4 +444,3 @@ export function LoginPage() {
     </div>
   )
 }
-
