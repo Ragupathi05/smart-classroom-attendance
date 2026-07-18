@@ -159,15 +159,35 @@ export const useAuthStore = create<AuthState>()(
           }
         }
 
-        const state = get()
-        const storedPassword = state.userPasswords?.[lower]
         const defaultPassword =
           detectedRole === "cr" ? "MITS@CR123" :
           detectedRole === "lr" ? "MITS@LR123" : null
 
         if (!defaultPassword) return false
 
-        const activePassword = storedPassword || defaultPassword
+        // Check database-synced password from sections store
+        const { useAcademicStore: useAcStore } = require("@/store")
+        const allSections = useAcStore.getState().sections || []
+        const rollNumber = lower.replace(/-cr$/, "").replace(/-lr$/, "")
+        const { useStudentStore: useStStore } = require("@/store")
+        const allStudents = useStStore.getState().classStudents || []
+        const matchedStudent = allStudents.find((s: any) => s.rollNumber.toLowerCase() === rollNumber)
+        
+        let dbPassword: string | undefined
+        if (matchedStudent) {
+          for (const sec of allSections) {
+            if (detectedRole === "cr" && sec.crName === matchedStudent.name) {
+              dbPassword = sec.crPassword
+              break
+            }
+            if (detectedRole === "lr" && sec.lrName === matchedStudent.name) {
+              dbPassword = sec.lrPassword
+              break
+            }
+          }
+        }
+
+        const activePassword = dbPassword || defaultPassword
         if (password !== activePassword) {
           return false
         }
@@ -201,10 +221,11 @@ export const useAuthStore = create<AuthState>()(
 
       changeUserPassword: (userId, current, newPass) => {
         const lower = userId.toLowerCase()
-        const state = get()
-        const storedPassword = state.userPasswords?.[lower]
         
         let detectedRole: UserRole = "faculty"
+        let studentName: string | null = null
+        const state = get()
+        
         if (state.user && state.user.id.toLowerCase() === lower) {
           detectedRole = state.user.role
         } else if (lower.includes("hod")) {
@@ -217,6 +238,7 @@ export const useAuthStore = create<AuthState>()(
           const student = students.find((s: any) => s.rollNumber.toLowerCase() === rollNumber)
 
           if (student) {
+            studentName = student.name
             const sections = useAcademicStore.getState().sections || []
             const isLr = sections.some((sec: any) => sec.lrName === student.name)
             const isCr = sections.some((sec: any) => sec.crName === student.name)
@@ -235,11 +257,28 @@ export const useAuthStore = create<AuthState>()(
           }
         }
 
+        // Get current active password from database-synced sections store
+        let dbPassword: string | undefined
+        if (studentName && (detectedRole === "cr" || detectedRole === "lr")) {
+          const { useAcademicStore } = require("@/store")
+          const sections = useAcademicStore.getState().sections || []
+          for (const sec of sections) {
+            if (detectedRole === "cr" && sec.crName === studentName) {
+              dbPassword = sec.crPassword
+              break
+            }
+            if (detectedRole === "lr" && sec.lrName === studentName) {
+              dbPassword = sec.lrPassword
+              break
+            }
+          }
+        }
+
         const defaultPassword = 
           detectedRole === "cr" ? "MITS@CR123" :
           detectedRole === "lr" ? "MITS@LR123" :
           detectedRole === "hod" ? "admin" : "faculty"
-        const activePassword = storedPassword || defaultPassword
+        const activePassword = dbPassword || defaultPassword
 
         if (current !== activePassword) {
           return { success: false, message: "Current password does not match." }
@@ -249,22 +288,37 @@ export const useAuthStore = create<AuthState>()(
           return { success: false, message: "New password must be at least 4 characters long." }
         }
 
-        set((curr) => ({
-          userPasswords: {
-            ...(curr.userPasswords || {}),
-            [lower]: newPass
-          }
-        }))
+        // Persist password change to Supabase for CR/LR roles
+        if (studentName && (detectedRole === "cr" || detectedRole === "lr")) {
+          const SupabaseService = require("@/services/SupabaseService").SupabaseService
+          SupabaseService.updateCRLRPasswordInSupabase(studentName, detectedRole as "cr" | "lr", newPass)
+            .then(() => {
+              // Re-sync sections to update crPassword/lrPassword in local store
+              const { useAcademicStore } = require("@/store")
+              useAcademicStore.getState().syncWithSupabase().catch(console.error)
+            })
+            .catch(console.error)
+        }
+
         return { success: true, message: "Password updated successfully." }
       },
 
       resetUserPassword: (userId, role) => {
-        const lower = userId.toLowerCase()
-        set((curr) => {
-          const newPasswords = { ...(curr.userPasswords || {}) }
-          delete newPasswords[lower]
-          return { userPasswords: newPasswords }
-        })
+        // Find the student name from roll number
+        const rollNumber = userId.toLowerCase().replace("-cr", "").replace("-lr", "")
+        const { useStudentStore, useAcademicStore } = require("@/store")
+        const students = useStudentStore.getState().classStudents || []
+        const student = students.find((s: any) => s.rollNumber.toLowerCase() === rollNumber)
+
+        if (student && (role === "cr" || role === "lr")) {
+          const SupabaseService = require("@/services/SupabaseService").SupabaseService
+          SupabaseService.resetCRLRPasswordInSupabase(student.name, role as "cr" | "lr")
+            .then(() => {
+              // Re-sync sections to update crPassword/lrPassword in local store
+              useAcademicStore.getState().syncWithSupabase().catch(console.error)
+            })
+            .catch(console.error)
+        }
       },
 
       updateUserProfile: ({ name, email, department, year, section, phone, mentor }) => {

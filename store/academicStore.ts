@@ -39,6 +39,8 @@ export interface Section {
   studentCount: number
   crName: string
   lrName: string
+  crPassword?: string
+  lrPassword?: string
   facultyCount: number
   status: "Active" | "Inactive"
   batchId?: string // Scopes sections to specific student cohorts

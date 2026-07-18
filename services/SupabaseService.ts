@@ -225,6 +225,7 @@ export const SupabaseService = {
         const lrObj = (roles || []).find(r => r.role === "LR")
 
         // Fallback: Fetch CR / LR names from student_section_assignments (roll_no_in_class)
+        // Format: "CR" (default password) or "CR:customPwd" (custom password)
         const { data: localRoles } = await supabase
           .from("student_section_assignments")
           .select(`
@@ -234,10 +235,17 @@ export const SupabaseService = {
             )
           `)
           .eq("section_id", s.id)
-          .in("roll_no_in_class", ["CR", "LR"])
+          .or("roll_no_in_class.like.CR%,roll_no_in_class.like.LR%")
 
-        const localCr = (localRoles || []).find(r => r.roll_no_in_class === "CR")
-        const localLr = (localRoles || []).find(r => r.roll_no_in_class === "LR")
+        const localCr = (localRoles || []).find(r => r.roll_no_in_class?.startsWith("CR"))
+        const localLr = (localRoles || []).find(r => r.roll_no_in_class?.startsWith("LR"))
+
+        // Parse password from roll_no_in_class (format: "CR" or "CR:customPwd")
+        const parseCRLRPassword = (val: string | null) => {
+          if (!val) return undefined
+          const colonIdx = val.indexOf(":")
+          return colonIdx > 0 ? val.substring(colonIdx + 1) : undefined
+        }
 
         const crName = crObj 
           ? (crObj.users as any)?.full_name || "Unassigned" 
@@ -246,6 +254,9 @@ export const SupabaseService = {
         const lrName = lrObj 
           ? (lrObj.users as any)?.full_name || "Unassigned" 
           : (localLr ? (localLr.students as any)?.full_name || "Unassigned" : "Unassigned")
+
+        const crPassword = parseCRLRPassword(localCr?.roll_no_in_class || null)
+        const lrPassword = parseCRLRPassword(localLr?.roll_no_in_class || null)
 
         // Fetch faculty assignment count
         const { count: facultyCount } = await supabase
@@ -265,6 +276,8 @@ export const SupabaseService = {
           studentCount: studentCount || 0,
           crName: crName,
           lrName: lrName,
+          crPassword: crPassword,
+          lrPassword: lrPassword,
           facultyCount: facultyCount || 0,
           status: s.is_active ? "Active" : "Inactive",
           batchId: s.program_id, // Map program_id as batchId for category filtering
@@ -321,17 +334,23 @@ export const SupabaseService = {
 
   async assignCRLRInSupabase(sectionId: string, crName: string, lrName: string, sessionId: string): Promise<boolean> {
     try {
-      // 1. Reset existing CR/LR roles for this section and session
-      const { error: resetErr } = await supabase
+      // 1. Reset existing CR/LR roles for this section and session (match CR, CR:pwd, LR, LR:pwd)
+      // Need two separate updates since PostgREST .in() doesn't support LIKE
+      await supabase
         .from("student_section_assignments")
         .update({ roll_no_in_class: null })
         .eq("section_id", sectionId)
         .eq("academic_session_id", sessionId)
-        .in("roll_no_in_class", ["CR", "LR"])
+        .like("roll_no_in_class", "CR%")
       
-      if (resetErr) console.warn("CR/LR reset warning:", resetErr.message)
+      await supabase
+        .from("student_section_assignments")
+        .update({ roll_no_in_class: null })
+        .eq("section_id", sectionId)
+        .eq("academic_session_id", sessionId)
+        .like("roll_no_in_class", "LR%")
 
-      // 2. Find the student who is assigned as CR
+      // 2. Find the student who is assigned as CR (default password = just "CR")
       if (crName && crName !== "To be assigned" && crName !== "Unassigned") {
         const { data: crStud } = await supabase
           .from("students")
@@ -354,7 +373,7 @@ export const SupabaseService = {
         }
       }
 
-      // 3. Find the student who is assigned as LR
+      // 3. Find the student who is assigned as LR (default password = just "LR")
       if (lrName && lrName !== "To be assigned" && lrName !== "Unassigned") {
         const { data: lrStud } = await supabase
           .from("students")
@@ -380,6 +399,77 @@ export const SupabaseService = {
       return true
     } catch (err) {
       console.error("Error assigning CR/LR in Supabase:", err)
+      return false
+    }
+  },
+
+  // Update CR/LR password in Supabase (stores as "CR:newPassword" or "LR:newPassword")
+  async updateCRLRPasswordInSupabase(studentName: string, role: "cr" | "lr", newPassword: string): Promise<boolean> {
+    try {
+      const rolePrefix = role === "cr" ? "CR" : "LR"
+      
+      // Find the student
+      const { data: student } = await supabase
+        .from("students")
+        .select("id")
+        .eq("full_name", studentName)
+        .limit(1)
+        .maybeSingle()
+
+      if (!student) {
+        console.warn("Student not found for password update:", studentName)
+        return false
+      }
+
+      // Update roll_no_in_class to "CR:newPassword" or "LR:newPassword"
+      const { error } = await supabase
+        .from("student_section_assignments")
+        .update({ roll_no_in_class: `${rolePrefix}:${newPassword}` })
+        .eq("student_id", student.id)
+        .like("roll_no_in_class", `${rolePrefix}%`)
+
+      if (error) {
+        console.error("Password update error:", error.message)
+        return false
+      }
+      return true
+    } catch (err) {
+      console.error("Error updating CR/LR password:", err)
+      return false
+    }
+  },
+
+  // Reset CR/LR password to default (stores as just "CR" or "LR")
+  async resetCRLRPasswordInSupabase(studentName: string, role: "cr" | "lr"): Promise<boolean> {
+    try {
+      const rolePrefix = role === "cr" ? "CR" : "LR"
+      
+      const { data: student } = await supabase
+        .from("students")
+        .select("id")
+        .eq("full_name", studentName)
+        .limit(1)
+        .maybeSingle()
+
+      if (!student) {
+        console.warn("Student not found for password reset:", studentName)
+        return false
+      }
+
+      // Reset to just "CR" or "LR" (means default password)
+      const { error } = await supabase
+        .from("student_section_assignments")
+        .update({ roll_no_in_class: rolePrefix })
+        .eq("student_id", student.id)
+        .like("roll_no_in_class", `${rolePrefix}%`)
+
+      if (error) {
+        console.error("Password reset error:", error.message)
+        return false
+      }
+      return true
+    } catch (err) {
+      console.error("Error resetting CR/LR password:", err)
       return false
     }
   },
