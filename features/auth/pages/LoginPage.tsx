@@ -32,6 +32,7 @@ export function LoginPage() {
   // Forgot password
   const [forgotEmail, setForgotEmail] = useState("")
   const [forgotSent, setForgotSent] = useState(false)
+  const [forgotSetupCode, setForgotSetupCode] = useState("")
 
   // Reset password (after clicking email link)
   const [newPassword, setNewPassword] = useState("")
@@ -123,20 +124,30 @@ export function LoginPage() {
     if (mode === "forgot") {
       if (!forgotEmail) { setError("Please enter your email address"); return }
       if (!forgotEmail.includes("@")) { setError("Please enter a valid email address"); return }
+      if (!forgotSetupCode) { setError("Please enter the institution setup code"); return }
+
       setIsLoading(true)
-      const redirectTo =
-        typeof window !== "undefined"
-          ? `${window.location.origin}${window.location.pathname}`
-          : "https://ragupathi05.github.io/smart-classroom-attendance/"
-      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(forgotEmail.trim().toLowerCase(), {
-        redirectTo,
-      })
-      setIsLoading(false)
-      if (resetErr) {
-        setError(resetErr.message)
-      } else {
-        setForgotSent(true)
-        toast.success("Password reset email sent! Check your inbox.")
+      try {
+        const { data, error: resetErr } = await supabase.rpc('reset_user_password', {
+          target_email: forgotEmail.trim().toLowerCase(),
+          setup_code: forgotSetupCode.trim()
+        })
+
+        setIsLoading(false)
+        if (resetErr) {
+          setError(resetErr.message)
+          toast.error("Reset failed: " + resetErr.message)
+        } else if (data === false) {
+          setError("Invalid email address or setup code.")
+          toast.error("Reset failed. Invalid email address or setup code.")
+        } else {
+          setForgotSent(true)
+          toast.success("Password reset successful!")
+        }
+      } catch (err: any) {
+        setIsLoading(false)
+        setError(err.message || "An unexpected error occurred.")
+        toast.error("An unexpected error occurred.")
       }
       return
     }
@@ -306,30 +317,44 @@ export function LoginPage() {
 
                 {/* ── FORGOT PASSWORD FORM ── */}
                 {mode === "forgot" && !forgotSent && (
-                  <Field>
-                    <FieldLabel htmlFor="forgotEmail" className="flex items-center gap-1.5">
-                      <Mail className="h-3 w-3 text-primary" />
-                      Your College Email
-                    </FieldLabel>
-                    <Input id="forgotEmail" type="email" placeholder="e.g. hod@mits.ac.in"
-                      value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)}
-                      className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg" />
-                  </Field>
+                  <>
+                    <Field>
+                      <FieldLabel htmlFor="forgotEmail" className="flex items-center gap-1.5">
+                        <Mail className="h-3 w-3 text-primary" />
+                        Your College Email
+                      </FieldLabel>
+                      <Input id="forgotEmail" type="email" placeholder="e.g. hod@mits.ac.in"
+                        value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)}
+                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg" />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="forgotSetupCode" className="flex items-center gap-1.5">
+                        <Shield className="h-3 w-3 text-amber-500" />
+                        Institution Setup Code
+                      </FieldLabel>
+                      <Input id="forgotSetupCode" type="password" placeholder="Enter the secret setup code"
+                        value={forgotSetupCode} onChange={(e) => setForgotSetupCode(e.target.value)}
+                        className="bg-input/40 transition-colors focus:bg-input h-10 text-xs font-semibold rounded-lg border-amber-500/30 focus:border-amber-500/60" />
+                    </Field>
+                  </>
                 )}
 
                 {/* ── FORGOT — EMAIL SENT CONFIRMATION ── */}
                 {mode === "forgot" && forgotSent && (
                   <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-4 text-center space-y-2">
                     <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10">
-                      <Mail className="h-5 w-5 text-green-500" />
+                      <KeyRound className="h-5 w-5 text-green-500" />
                     </div>
-                    <p className="text-sm font-black text-foreground">Check Your Inbox!</p>
+                    <p className="text-sm font-black text-foreground">Password Reset Success!</p>
                     <p className="text-xs text-muted-foreground">
-                      A password reset link has been sent to <span className="font-bold text-foreground">{forgotEmail}</span>.
-                      Click the link in the email to set a new password.
+                      Your password has been successfully reset to the default password:
                     </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      Didn't receive it? Check your spam folder. The link expires in 1 hour.
+                    <div className="bg-input/60 rounded-lg p-2 font-mono text-xs font-bold text-foreground">
+                      MITS@HOD123 (for HOD) <br/>
+                      Faculty@&lt;FacultyCode&gt;123 (for Faculty)
+                    </div>
+                    <p className="text-[10px] text-muted-foreground pt-1">
+                      You can now sign in using this default password.
                     </p>
                   </div>
                 )}
@@ -400,7 +425,7 @@ export function LoginPage() {
                       {{
                         login: "Authenticating...",
                         register: "Registering...",
-                        forgot: "Sending Email...",
+                        forgot: "Resetting Password...",
                         reset: "Updating Password...",
                       }[mode]}
                     </span>
@@ -408,7 +433,7 @@ export function LoginPage() {
                     {
                       login: "SIGN IN",
                       register: "CREATE HOD ACCOUNT",
-                      forgot: "SEND RESET LINK",
+                      forgot: "RESET PASSWORD TO DEFAULT",
                       reset: "SET NEW PASSWORD",
                     }[mode]
                   )}
