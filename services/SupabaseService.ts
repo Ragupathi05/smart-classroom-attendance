@@ -533,7 +533,19 @@ export const SupabaseService = {
       const signupClient = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        { auth: { persistSession: false, autoRefreshToken: false } }
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+            storageKey: "sb-signup-temp-token",
+            storage: {
+              getItem: () => null,
+              setItem: () => {},
+              removeItem: () => {}
+            }
+          }
+        }
       )
 
       // 1. Create auth user via signUp (generates a valid auth.users entry)
