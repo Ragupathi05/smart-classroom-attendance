@@ -209,7 +209,10 @@ export const SupabaseService = {
           semester,
           program_id,
           academic_session_id,
-          is_active
+          is_active,
+          departments (
+            code
+          )
         `)
         .eq("department_id", deptId)
 
@@ -281,10 +284,11 @@ export const SupabaseService = {
           .eq("is_active", true)
 
         const yearLabel = yearToLabel(s.year)
+        const deptCode = (s.departments as any)?.code ? (s.departments as any).code.split("@")[0] : "CSE"
 
         sectionsList.push({
           id: s.id,
-          name: `${getRomanYear(yearLabel)} CSE ${s.section_name}`,
+          name: `${getRomanYear(yearLabel)} ${deptCode} ${s.section_name}`,
           year: yearLabel,
           semester: s.semester % 2 === 0 ? "Even" : "Odd",
           sectionName: s.section_name,
@@ -729,7 +733,10 @@ export const SupabaseService = {
           ),
           sections (
             section_name,
-            year
+            year,
+            departments (
+              code
+            )
           )
         `)
         .eq("faculty_id", facultyId)
@@ -738,7 +745,12 @@ export const SupabaseService = {
 
       // Extract unique subject names and section names from current assignments
       const currentSubjects = Array.from(new Set((currentAssigns || []).map(a => (a.subjects as any)?.subject_name).filter(Boolean))) as string[]
-      const currentSections = Array.from(new Set((currentAssigns || []).map(a => `${getRomanYear(yearToLabel((a.sections as any)?.year))} CSE ${(a.sections as any)?.section_name}`).filter(Boolean))) as string[]
+      const currentSections = Array.from(new Set((currentAssigns || []).map(a => {
+        const s = (a.sections as any)
+        if (!s) return null
+        const deptCode = s.departments?.code ? s.departments.code.split("@")[0] : "CSE"
+        return `${getRomanYear(yearToLabel(s.year))} ${deptCode} ${s.section_name}`
+      }).filter(Boolean))) as string[]
 
       const targetSubjects = subjects !== undefined ? subjects : currentSubjects
       const targetSections = sections !== undefined ? sections : currentSections
@@ -789,12 +801,20 @@ export const SupabaseService = {
       // Fetch sections for this department
       const { data: dbSections } = await supabase
         .from("sections")
-        .select("id, section_name, year")
+        .select(`
+          id,
+          section_name,
+          year,
+          departments (
+            code
+          )
+        `)
         .eq("department_id", deptId)
 
       for (const name of targetSections) {
         const matched = (dbSections || []).find(s => {
-          const sName = `${getRomanYear(yearToLabel(s.year))} CSE ${s.section_name}`
+          const deptCode = (s.departments as any)?.code ? (s.departments as any).code.split("@")[0] : "CSE"
+          const sName = `${getRomanYear(yearToLabel(s.year))} ${deptCode} ${s.section_name}`
           return sName.toLowerCase() === name.toLowerCase()
         })
         if (matched) {
