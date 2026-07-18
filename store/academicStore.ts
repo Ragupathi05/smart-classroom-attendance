@@ -274,10 +274,47 @@ export const useAcademicStore = create<AcademicState>()(
         sections: state.sections.map((s) => s.id === id ? { ...s, ...updatedFields } : s)
       })),
 
-      deleteSection: (id) => set((state) => ({
-        sections: state.sections.filter((s) => s.id !== id),
-        selectedSectionWorkspace: state.selectedSectionWorkspace === id ? null : state.selectedSectionWorkspace
-      })),
+      deleteSection: (id) => {
+        set((state) => ({
+          sections: state.sections.filter((s) => s.id !== id),
+          selectedSectionWorkspace: state.selectedSectionWorkspace === id ? null : state.selectedSectionWorkspace,
+          enrollments: state.enrollments.filter((e) => e.sectionId !== id)
+        }))
+
+        // Clean up timetable store for this section
+        try {
+          const { useTimetableStore } = require("./timetableStore")
+          useTimetableStore.setState((tState: any) => {
+            const nextTimetables = { ...tState.timetables }
+            delete nextTimetables[id]
+            
+            const nextFilter = tState.currentSectionFilter === id ? "" : tState.currentSectionFilter
+            const nextTimetable = tState.currentSectionFilter === id ? [] : tState.timetable
+            
+            return {
+              timetables: nextTimetables,
+              currentSectionFilter: nextFilter,
+              timetable: nextTimetable
+            }
+          })
+        } catch (err) {
+          console.warn("Failed to clean up timetable store on section deletion:", err)
+        }
+
+        // Clean up attendance store for this section
+        try {
+          const { useAttendanceStore } = require("./attendanceStore")
+          useAttendanceStore.setState((aState: any) => ({
+            attendanceRecords: aState.attendanceRecords.filter((r: any) => r.sectionId !== id)
+          }))
+        } catch (err) {
+          console.warn("Failed to clean up attendance store on section deletion:", err)
+        }
+
+        // Persist deletion to Supabase in the background
+        const { SupabaseService } = require("@/services/SupabaseService")
+        SupabaseService.deleteSectionInSupabase(id).catch(console.error)
+      },
 
       addFaculty: (faculty) => {
         // Optimistically add to local state with temp ID

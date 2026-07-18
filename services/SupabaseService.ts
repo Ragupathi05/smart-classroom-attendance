@@ -950,6 +950,49 @@ export const SupabaseService = {
     }
   },
 
+  async deleteSectionInSupabase(id: string): Promise<boolean> {
+    try {
+      // 1. Delete timetable cells for this section
+      await supabase
+        .from("app_timetable_cells")
+        .delete()
+        .eq("section_id", id)
+
+      // 2. Delete attendance records for this section
+      await supabase
+        .from("app_attendance_records")
+        .delete()
+        .eq("section_id", id)
+
+      // 3. Delete faculty assignments for this section
+      await supabase
+        .from("faculty_assignments")
+        .delete()
+        .eq("section_id", id)
+
+      // 4. Delete student section assignments for this section
+      await supabase
+        .from("student_section_assignments")
+        .delete()
+        .eq("section_id", id)
+
+      // 5. Delete the section itself
+      const { error } = await supabase
+        .from("sections")
+        .delete()
+        .eq("id", id)
+
+      if (error) {
+        console.error("Error deleting section:", error.message)
+        return false
+      }
+      return true
+    } catch (err) {
+      console.error("Error deleting section in Supabase:", err)
+      return false
+    }
+  },
+
   async fetchStudentsRoster(sectionId: string): Promise<Student[]> {
     try {
       const { data, error } = await supabase
