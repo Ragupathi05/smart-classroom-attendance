@@ -82,7 +82,7 @@ export function HodPeoplePage() {
   const [facWorkloadLimit, setFacWorkloadLimit] = useState("16")
   const [editFacWorkloadLimit, setEditFacWorkloadLimit] = useState("16")
 
-  const [activeTab, setActiveTab] = useState<"faculty" | "crlr">("faculty")
+  const [activeTab, setActiveTab] = useState<"faculty" | "crlr">("crlr")
   const [selectedFaculty, setSelectedFaculty] = useState<FacultyMember | null>(null)
   
   // Search queries
@@ -298,35 +298,10 @@ export function HodPeoplePage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-black text-foreground text-gradient-primary">People Directory</h1>
+          <h1 className="text-2xl font-black text-foreground text-gradient-primary">Class Representatives</h1>
           <p className="text-muted-foreground text-xs font-semibold">
-            Manage teaching staff directory, configure workloads, and assign class representatives.
+            Assign and manage Class Representatives (CR) and Lecture Representatives (LR) for each classroom section.
           </p>
-        </div>
-
-        {/* Tab switcher */}
-        <div className="flex rounded-xl bg-card border border-border/80 p-1 shadow-sm w-fit shrink-0">
-          {[
-            { id: "faculty", label: "Faculty Directory", icon: Users },
-            { id: "crlr", label: "CR/LR Assignments", icon: UserCheck },
-          ].map((tab) => (
-            <Button
-              key={tab.id}
-              onClick={() => {
-                setActiveTab(tab.id as any)
-                setSelectedFaculty(null)
-              }}
-              variant={activeTab === tab.id ? "default" : "ghost"}
-              className={cn(
-                "rounded-lg text-xs font-bold px-4 py-1.5 h-auto transition-all duration-150 uppercase tracking-wider",
-                activeTab === tab.id && "shadow-sm bg-primary text-primary-foreground font-black"
-              )}
-              type="button"
-            >
-              <tab.icon className="mr-1.5 h-3.5 w-3.5" />
-              {tab.label}
-            </Button>
-          ))}
         </div>
       </div>
 

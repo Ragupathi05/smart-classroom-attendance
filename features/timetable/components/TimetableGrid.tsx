@@ -255,34 +255,14 @@ export function TimetableGrid({ readOnly = false, hideStatusColors = false }: Ti
   const [overrideNotes, setOverrideNotes] = useState("")
   const [formAttendanceRequired, setFormAttendanceRequired] = useState<"Required" | "Optional" | "Not Required">("Required")
   
-  const selectedFacultyObj = useMemo(() => {
-    return facultyList.find(f => {
-      const optionVal = `${f.name} (${f.code})`
-      return optionVal === formFacultyName || f.name === formFacultyName
-    })
-  }, [facultyList, formFacultyName])
+  const selectedFacultyObj = null
 
   const availableSubjects = useMemo(() => {
-    if (!selectedFacultyObj) {
-      return Object.entries(SUBJECTS).map(([code, name]) => ({
-        code,
-        name: `${name} (${code})`
-      }))
-    }
-    return selectedFacultyObj.subjects.map(subStr => {
-      const match = subStr.match(/^(.*?)\s*\((.*?)\)$/)
-      if (match) {
-        return {
-          code: match[2].trim().toUpperCase(),
-          name: subStr.trim()
-        }
-      }
-      return {
-        code: subStr.trim().toUpperCase(),
-        name: subStr.trim()
-      }
-    })
-  }, [selectedFacultyObj])
+    return Object.entries(SUBJECTS).map(([code, name]) => ({
+      code,
+      name: `${name} (${code})`
+    }))
+  }, [])
   
   // Custom scope states for overrides
   const [overrideScope, setOverrideScope] = useState<"single" | "batch" | "all" | "custom">("single")
@@ -461,44 +441,13 @@ export function TimetableGrid({ readOnly = false, hideStatusColors = false }: Ti
       setFormRoom(cell.roomName || SUBJECT_ROOMS[cell.subjectCode] || "Room 402")
       setFormAttendanceRequired(cell.attendanceRequired || "Required")
 
-      const matchedFaculty = facultyList.find(f => {
-        const optionVal = `${f.name} (${f.code})`
-        return optionVal === cell.facultyName || f.name === cell.facultyName
-      })
+      setFormFacultyName(cell.facultyName || "")
+      setCustomFacultyName("")
 
-      if (matchedFaculty) {
-        setFormFacultyName(`${matchedFaculty.name} (${matchedFaculty.code})`)
-        setCustomFacultyName("")
-      } else if (cell.facultyName) {
-        setFormFacultyName("other")
-        setCustomFacultyName(cell.facultyName)
-      } else {
-        setFormFacultyName("")
-        setCustomFacultyName("")
-      }
-
-      const stdName = SUBJECTS[cell.subjectCode]
-      if (stdName) {
-        setFormSubjectName(stdName)
-        setCustomSubjectName("")
-        setFormSubjectCode(cell.subjectCode)
-      } else if (cell.subjectName) {
-        // Check if there is a match in faculty subjects or global SUBJECTS
-        const globalCode = Object.keys(SUBJECTS).find(k => SUBJECTS[k] === cell.subjectName)
-        if (globalCode) {
-          setFormSubjectName(cell.subjectName)
-          setCustomSubjectName("")
-          setFormSubjectCode(globalCode)
-        } else {
-          setFormSubjectName("other")
-          setCustomSubjectName(cell.subjectName)
-          setFormSubjectCode(cell.subjectCode)
-        }
-      } else {
-        setFormSubjectName("")
-        setCustomSubjectName("")
-        setFormSubjectCode("")
-      }
+      const stdName = cell.subjectName || SUBJECTS[cell.subjectCode] || ""
+      setFormSubjectName(stdName)
+      setCustomSubjectName("")
+      setFormSubjectCode(cell.subjectCode || "")
       
       const cellDateStr = getLocalDateStringForDay(cell.day)
       const sessionKey = `${cellDateStr}_${cell.id}`
@@ -1156,90 +1105,30 @@ export function TimetableGrid({ readOnly = false, hideStatusColors = false }: Ti
               <div className="space-y-4">
                 <div>
                   <label className="block text-muted-foreground uppercase tracking-widest text-[9px] mb-1.5 font-black">Faculty Name</label>
-                  <select
+                  <Input
+                    placeholder="e.g. Mr. Sivaraman"
                     value={formFacultyName}
-                    onChange={(e) => {
-                      setFormFacultyName(e.target.value)
-                      if (e.target.value !== "other") {
-                        setCustomFacultyName("")
-                      }
-                    }}
-                    className="bg-input/40 text-xs font-semibold h-9 rounded-lg border border-border w-full px-3 focus:outline-none"
+                    onChange={(e) => setFormFacultyName(e.target.value)}
+                    className="bg-input/40 text-xs font-semibold h-9 rounded-lg border border-border w-full focus:outline-none"
                     required
-                  >
-                    <option value="">Select Faculty</option>
-                    {facultyList.map((f) => (
-                      <option key={f.id} value={`${f.name} (${f.code})`}>
-                        {f.name} ({f.code})
-                      </option>
-                    ))}
-                    <option value="other">- (Custom Name / Free Period)</option>
-                    {formFacultyName && formFacultyName !== "other" && !facultyList.some(f => `${f.name} (${f.code})` === formFacultyName || f.name === formFacultyName) && (
-                      <option value={formFacultyName}>{formFacultyName}</option>
-                    )}
-                  </select>
-                  {formFacultyName === "other" && (
-                    <div className="mt-2 animate-fade-in">
-                      <Input
-                        placeholder="Type custom name (e.g. Free Period, Library)"
-                        value={customFacultyName}
-                        onChange={(e) => setCustomFacultyName(e.target.value)}
-                        className="bg-input/40 text-xs font-semibold h-9 rounded-lg border border-border"
-                        required
-                      />
-                    </div>
-                  )}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-muted-foreground uppercase tracking-widest text-[9px] mb-1.5 font-black">Subject Name</label>
-                  <select
+                  <Input
+                    placeholder="e.g. Data Structures"
                     value={formSubjectName}
-                    onChange={(e) => {
-                      const val = e.target.value
-                      setFormSubjectName(val)
-                      if (val !== "other") {
-                        const matched = availableSubjects.find(sub => sub.name === val)
-                        if (matched) {
-                          setFormSubjectCode(matched.code)
-                        }
-                        setCustomSubjectName("")
-                      } else {
-                        setFormSubjectCode("")
-                        setCustomSubjectName("")
-                      }
-                    }}
-                    className="bg-input/40 text-xs font-semibold h-9 rounded-lg border border-border w-full px-3 focus:outline-none"
+                    onChange={(e) => setFormSubjectName(e.target.value)}
+                    className="bg-input/40 text-xs font-semibold h-9 rounded-lg border border-border w-full focus:outline-none"
                     required
-                  >
-                    <option value="">Select Subject</option>
-                    {availableSubjects.map((sub) => (
-                      <option key={sub.code} value={sub.name}>
-                        {sub.name}
-                      </option>
-                    ))}
-                    <option value="other">Other / Custom Subject</option>
-                    {formSubjectName && formSubjectName !== "other" && !availableSubjects.some(s => s.name === formSubjectName) && (
-                      <option value={formSubjectName}>{formSubjectName}</option>
-                    )}
-                  </select>
-                  {formSubjectName === "other" && (
-                    <div className="mt-2 animate-fade-in">
-                      <Input
-                        placeholder="Type custom subject name (e.g. Data Structures)"
-                        value={customSubjectName}
-                        onChange={(e) => setCustomSubjectName(e.target.value)}
-                        className="bg-input/40 text-xs font-semibold h-9 rounded-lg border border-border"
-                        required
-                      />
-                    </div>
-                  )}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-muted-foreground uppercase tracking-widest text-[9px] mb-1.5 font-black">Subject Code</label>
                   <Input
-                    placeholder="Type subject code (e.g. 23CSE103)"
+                    placeholder="e.g. 23CSM301"
                     value={formSubjectCode}
                     onChange={(e) => setFormSubjectCode(e.target.value)}
                     className="bg-input/40 text-xs font-semibold h-9 rounded-lg border border-border"

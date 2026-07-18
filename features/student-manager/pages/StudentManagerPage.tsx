@@ -32,6 +32,7 @@ export function StudentManagerPage() {
   const {
     selectedSectionWorkspace,
     sections,
+    batches,
     getSectionStudentsWithStatus,
     transferStudent,
     toggleStudentActive,
@@ -42,6 +43,12 @@ export function StudentManagerPage() {
 
   const [selectedSectionFilter, setSelectedSectionFilter] = useState(() => {
     return isCRLR ? (user?.sectionId || "sec-1") : (selectedSectionWorkspace || "sec-1")
+  })
+
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState(() => {
+    const initialSecId = isCRLR ? (user?.sectionId || "sec-1") : (selectedSectionWorkspace || "sec-1")
+    const sec = sections.find(s => s.id === initialSecId)
+    return sec?.batchId || batches[0]?.id || ""
   })
 
   const displayStudents = useMemo(() => {
@@ -306,17 +313,42 @@ export function StudentManagerPage() {
                 <CardDescription className="text-muted-foreground">Manage class student details and imports</CardDescription>
               </div>
               {!isCRLR && (
-                <div className="flex items-center gap-1.5 ml-4">
-                  <span className="text-xs text-muted-foreground font-bold">Section:</span>
-                  <select
-                    value={selectedSectionFilter}
-                    onChange={(e) => setSelectedSectionFilter(e.target.value)}
-                    className="bg-background border border-border text-xs font-bold rounded-xl h-8 px-3 focus:outline-none"
-                  >
-                    {sections.map((sec) => (
-                      <option key={sec.id} value={sec.id}>{sec.name}</option>
-                    ))}
-                  </select>
+                <div className="flex items-center gap-3 ml-4">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground font-bold">Batch:</span>
+                    <select
+                      value={selectedBatchFilter}
+                      onChange={(e) => {
+                        const newBatchId = e.target.value
+                        setSelectedBatchFilter(newBatchId)
+                        // Auto-select the first section under the new batch
+                        const firstSec = sections.find(s => s.batchId === newBatchId)
+                        if (firstSec) {
+                          setSelectedSectionFilter(firstSec.id)
+                        }
+                      }}
+                      className="bg-background border border-border text-xs font-bold rounded-xl h-8 px-3 focus:outline-none"
+                    >
+                      {batches.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground font-bold">Section:</span>
+                    <select
+                      value={selectedSectionFilter}
+                      onChange={(e) => setSelectedSectionFilter(e.target.value)}
+                      className="bg-background border border-border text-xs font-bold rounded-xl h-8 px-3 focus:outline-none"
+                    >
+                      {sections
+                        .filter((sec) => sec.batchId === selectedBatchFilter)
+                        .map((sec) => (
+                          <option key={sec.id} value={sec.id}>{sec.name}</option>
+                        ))}
+                    </select>
+                  </div>
                 </div>
               )}
             </div>

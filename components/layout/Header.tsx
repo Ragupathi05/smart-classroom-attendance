@@ -74,7 +74,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       case "academic":
         return [...base, "Academic", "Programs & Sessions"]
       case "people":
-        return [...base, "People", "Faculty Directory"]
+        return [...base, "Class Reps"]
       case "timetable-editor":
         return [...base, "Timetable Builder"]
       case "attendance-monitoring":

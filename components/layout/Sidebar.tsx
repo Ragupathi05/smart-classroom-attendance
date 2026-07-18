@@ -43,13 +43,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         return [
           { name: "Dashboard", icon: LayoutDashboard, page: "dashboard" },
           { name: "Academic", icon: GraduationCap, page: "academic" },
-          { name: "People", icon: Users, page: "people" },
+          { name: "Class Reps", icon: Users, page: "people" },
           { name: "Timetable", icon: CalendarDays, page: "timetable-editor" },
           { name: "Calendar", icon: Calendar, page: "calendar" },
           { name: "Attendance", icon: ClipboardCheck, page: "attendance-monitoring" },
           { name: "Analytics", icon: BarChart3, page: "analytics" },
           { name: "Notifications", icon: Bell, page: "notifications" },
-          { name: "Settings", icon: Settings, page: "settings" },
         ]
       case "faculty":
         return [
@@ -58,7 +57,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           { name: "Attendance", icon: ClipboardCheck, page: "mark-attendance" },
           { name: "History", icon: History, page: "history" },
           { name: "Analytics", icon: BarChart3, page: "analytics" },
-          { name: "Profile", icon: User, page: "profile" },
         ]
       case "cr":
       case "lr":
@@ -68,7 +66,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           { name: "History", icon: History, page: "history" },
           { name: "Analytics", icon: BarChart3, page: "analytics" },
           { name: "Notifications", icon: Bell, page: "notifications" },
-          { name: "Profile", icon: User, page: "profile" },
           { name: "Weekly Timetable", icon: CalendarDays, page: "weekly-timetable" },
         ]
     }

@@ -565,31 +565,44 @@ export function HodAcademicPage() {
         </div>
 
         {/* Overview Stats Row */}
-        <div className="grid gap-4 sm:grid-cols-4">
-          {[
-            { label: "Total Students", value: selectedSectionWorkspace ? getSectionRoster(selectedSectionWorkspace).length : 0, icon: Users, cardClass: "stats-card-indigo", iconColor: "text-indigo-650 dark:text-indigo-400" },
-            { label: "Assigned Faculty", value: assignedFaculty.length, icon: Layers, cardClass: "stats-card-indigo", iconColor: "text-indigo-650 dark:text-indigo-400" },
-            { label: "Subjects taught", value: assignedFaculty.length > 0 ? Array.from(new Set(assignedFaculty.flatMap(f => f.subjects))).length : 0, icon: BookOpen, cardClass: "stats-card-amber", iconColor: "text-amber-600 dark:text-amber-400" },
-            { label: "Overall Attendance", value: overallAttendanceLabel, icon: TrendingUp, cardClass: "stats-card-emerald", iconColor: "text-emerald-650 dark:text-emerald-400" },
-          ].map((stat) => (
-            <div key={stat.label} className={cn("rounded-2xl p-4 flex items-center justify-between transition-all duration-300 hover:scale-[1.02] shadow-sm bg-card/65", stat.cardClass)}>
-              <div className="space-y-0.5">
-                <p className="text-[9px] uppercase font-black tracking-wider text-muted-foreground">{stat.label}</p>
-                <p className="text-2xl font-black text-foreground">{stat.value}</p>
-              </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-background/90 shadow-sm border border-border/40">
-                <stat.icon className={cn("h-5 w-5", stat.iconColor)} />
-              </div>
+        {(() => {
+          const cells = selectedSectionWorkspace ? (timetables[selectedSectionWorkspace] || []) : []
+          const uniqueFaculty = Array.from(new Set(
+            cells.map(c => c.facultyName?.trim())
+                 .filter(f => f && f !== "-" && f !== "Assigned" && f.toLowerCase() !== "free period" && f.toLowerCase() !== "free hour")
+          ))
+          const uniqueSubjects = Array.from(new Set(
+            cells.map(c => c.subjectName?.trim())
+                 .filter(s => s && s !== "-" && s.toLowerCase() !== "free period" && s.toLowerCase() !== "free hour")
+          ))
+          
+          return (
+            <div className="grid gap-4 sm:grid-cols-4">
+              {[
+                { label: "Total Students", value: selectedSectionWorkspace ? getSectionRoster(selectedSectionWorkspace).length : 0, icon: Users, cardClass: "stats-card-indigo", iconColor: "text-indigo-650 dark:text-indigo-400" },
+                { label: "Assigned Faculty", value: uniqueFaculty.length, icon: Layers, cardClass: "stats-card-indigo", iconColor: "text-indigo-650 dark:text-indigo-400" },
+                { label: "Subjects taught", value: uniqueSubjects.length, icon: BookOpen, cardClass: "stats-card-amber", iconColor: "text-amber-600 dark:text-amber-400" },
+                { label: "Overall Attendance", value: overallAttendanceLabel, icon: TrendingUp, cardClass: "stats-card-emerald", iconColor: "text-emerald-650 dark:text-emerald-400" },
+              ].map((stat) => (
+                <div key={stat.label} className={cn("rounded-2xl p-4 flex items-center justify-between transition-all duration-300 hover:scale-[1.02] shadow-sm bg-card/65", stat.cardClass)}>
+                  <div className="space-y-0.5">
+                    <p className="text-[9px] uppercase font-black tracking-wider text-muted-foreground">{stat.label}</p>
+                    <p className="text-2xl font-black text-foreground">{stat.value}</p>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-background/90 shadow-sm border border-border/40">
+                    <stat.icon className={cn("h-5 w-5", stat.iconColor)} />
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )
+        })()}
 
         {/* Tab Controls */}
         <div className="flex border-b border-border gap-2">
           {[
             { id: "overview", label: "Overview" },
             { id: "students", label: "Student Management" },
-            { id: "faculty", label: "Faculty Directory" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -917,59 +930,7 @@ export function HodAcademicPage() {
           </Card>
         )}
 
-        {workspaceTab === "faculty" && (
-          <Card className="border-border/60 rounded-xl shadow-sm">
-            <CardHeader className="pb-3 border-b border-border/50">
-              <CardTitle className="text-sm font-black uppercase tracking-wider text-muted-foreground">Assigned Faculty Staff</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-border/50 bg-secondary/20 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                      <th className="p-4 pl-6">Faculty Code</th>
-                      <th className="p-4">Staff Name</th>
-                      <th className="p-4">Assigned Subjects</th>
-                      <th className="p-4">Weekly Load</th>
-                      <th className="p-4 text-center pr-6">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/40 text-xs font-semibold">
-                    {assignedFaculty.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="p-8 text-center text-muted-foreground font-semibold">
-                          No faculty assigned to this classroom section yet. Publish a timetable to assign teaching staff.
-                        </td>
-                      </tr>
-                    ) : (
-                      assignedFaculty.map((f) => (
-                        <tr key={f.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="p-4 pl-6 font-mono font-bold text-primary">{f.code}</td>
-                        <td className="p-4 text-foreground font-bold">{f.name}</td>
-                        <td className="p-4">
-                          <div className="flex flex-wrap gap-1">
-                            {f.subjects.map((sub) => (
-                              <Badge key={sub} variant="outline" className="text-[10px] font-bold border-border/70">
-                                {sub}
-                              </Badge>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="p-4 font-bold text-foreground">{f.weeklyLoad} Hours</td>
-                        <td className="p-4 text-center pr-6">
-                          <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none font-bold px-2 py-0 text-[10px] uppercase">
-                            Active
-                          </Badge>
-                        </td>
-                      </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+
       </div>
     )
   }
