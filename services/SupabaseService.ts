@@ -34,6 +34,21 @@ export const SupabaseService = {
   // 1. Initialize Default Department
   async getOrInitializeDepartmentId(): Promise<string> {
     try {
+      // 1. Try to get the active logged-in user's department ID first
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        const { data: userProfile } = await supabase
+          .from("users")
+          .select("department_id")
+          .eq("id", session.user.id)
+          .maybeSingle()
+
+        if (userProfile?.department_id) {
+          return userProfile.department_id
+        }
+      }
+
+      // 2. Fallback to default department check/creation
       const { data, error } = await supabase
         .from("departments")
         .select("id")
