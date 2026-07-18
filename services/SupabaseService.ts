@@ -543,6 +543,29 @@ export const SupabaseService = {
 
   async createFaculty(fac: Omit<FacultyMember, "id">, deptId: string): Promise<FacultyMember | null> {
     try {
+      // 0. Check if the profile already exists in the public users table
+      const { data: existingUser } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", fac.email.trim().toLowerCase())
+        .maybeSingle()
+
+      if (existingUser) {
+        return {
+          id: existingUser.id,
+          code: existingUser.faculty_code,
+          name: existingUser.full_name,
+          department: "CSE",
+          email: existingUser.email,
+          phone: existingUser.phone || "",
+          subjects: [],
+          sections: [],
+          weeklyLoad: 0,
+          attendancePending: 0,
+          status: existingUser.is_active ? "Active" : "Inactive"
+        }
+      }
+
       // Use a separate Supabase client for signup so we don't affect the HOD's session
       const { createClient } = await import("@supabase/supabase-js")
       const signupClient = createClient(
@@ -563,8 +586,10 @@ export const SupabaseService = {
         }
       )
 
-      // 1. Create auth user via signUp (generates a valid auth.users entry)
       const tempPassword = `Faculty@${fac.code}123`
+      let authUserId: string | undefined
+
+      // 1. Create auth user via signUp (generates a valid auth.users entry)
       const { data: authData, error: authError } = await signupClient.auth.signUp({
         email: fac.email,
         password: tempPassword,
@@ -574,15 +599,29 @@ export const SupabaseService = {
       })
 
       if (authError) {
-        console.error("Auth signUp error:", authError.message)
-        throw authError
+        // Fallback: If user is already registered in Auth, try to sign in to get their user ID
+        if (authError.message.toLowerCase().includes("already registered") || authError.status === 422) {
+          console.warn("User already registered in Auth. Attempting fallback sign-in to retrieve ID.")
+          const { data: signInData, error: signInErr } = await signupClient.auth.signInWithPassword({
+            email: fac.email,
+            password: tempPassword
+          })
+          if (signInErr) {
+            console.error("Fallback sign-in failed:", signInErr.message)
+            throw authError
+          }
+          authUserId = signInData?.user?.id
+        } else {
+          console.error("Auth signUp error:", authError.message)
+          throw authError
+        }
+      } else {
+        authUserId = authData?.user?.id
       }
 
-      if (!authData.user) {
-        throw new Error("No user returned from signUp")
+      if (!authUserId) {
+        throw new Error("Could not resolve auth user ID")
       }
-
-      const authUserId = authData.user.id
 
       // 2. Insert into users table using the auth user ID (satisfies FK to auth.users)
       const { data, error } = await supabase
