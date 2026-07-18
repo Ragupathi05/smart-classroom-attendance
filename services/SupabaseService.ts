@@ -34,7 +34,22 @@ export const SupabaseService = {
   // 1. Initialize Default Department
   async getOrInitializeDepartmentId(): Promise<string> {
     try {
-      // 1. Try to get the active logged-in user's department ID first
+      // 1. Try to get the active logged-in user's department ID from the auth store
+      const { useAuthStore } = require("@/store")
+      const localUser = useAuthStore.getState().user
+      if (localUser?.id) {
+        const { data: userProfile } = await supabase
+          .from("users")
+          .select("department_id")
+          .eq("id", localUser.id)
+          .maybeSingle()
+
+        if (userProfile?.department_id) {
+          return userProfile.department_id
+        }
+      }
+
+      // 2. Try to get the active logged-in user's department ID from Supabase Auth session
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         const { data: userProfile } = await supabase
@@ -48,7 +63,17 @@ export const SupabaseService = {
         }
       }
 
-      // 2. Fallback to default department check/creation
+      // 3. Fallback to reusing ANY existing department in the database (e.g. CSM)
+      const { data: existingDepts } = await supabase
+        .from("departments")
+        .select("id")
+        .limit(1)
+
+      if (existingDepts && existingDepts.length > 0) {
+        return existingDepts[0].id
+      }
+
+      // 4. Fallback to default department check/creation if no department exists at all
       const { data, error } = await supabase
         .from("departments")
         .select("id")
