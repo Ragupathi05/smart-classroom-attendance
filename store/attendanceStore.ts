@@ -501,9 +501,27 @@ export const useAttendanceStore = create<AttendanceState>()(
         }),
 
       hydrateAttendanceRecords: () => {
-        const savedRecords = AttendanceService.loadRecords()
-        if (savedRecords.length === 0) return
-        set({ attendanceRecords: savedRecords })
+        AppSyncService.fetchAttendanceRecords()
+          .then((records) => {
+            if (records && records.length > 0) {
+              set({ attendanceRecords: records })
+              AttendanceService.saveRecords(records)
+              
+              // Update timetable statuses based on imported/hydrated records
+              const usedCellIds = new Set(records.flatMap((r) => r.cellIds || []))
+              if (usedCellIds.size > 0) {
+                useTimetableStore.setState((tState) => ({
+                  timetable: tState.timetable.map((entry) => {
+                    if (usedCellIds.has(entry.id)) {
+                      return { ...entry, status: "completed" as const }
+                    }
+                    return entry
+                  })
+                }))
+              }
+            }
+          })
+          .catch(console.error)
       },
 
       submitCorrectionRequest: ({ recordId, studentId, reason }) => {

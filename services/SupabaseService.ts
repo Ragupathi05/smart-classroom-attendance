@@ -618,20 +618,191 @@ export const SupabaseService = {
       if (fields.code !== undefined) updateData.faculty_code = fields.code
       if (fields.status !== undefined) updateData.is_active = fields.status === "Active"
 
-      if (Object.keys(updateData).length === 0) return true
+      if (Object.keys(updateData).length > 0) {
+        const { error } = await supabase
+          .from("users")
+          .update(updateData)
+          .eq("id", id)
 
-      const { error } = await supabase
-        .from("users")
-        .update(updateData)
-        .eq("id", id)
-
-      if (error) {
-        console.error("Error updating faculty:", error.message)
-        return false
+        if (error) {
+          console.error("Error updating faculty profile:", error.message)
+          return false
+        }
       }
+
+      // Sync subjects/sections to faculty_assignments table if updated
+      if (fields.subjects !== undefined || fields.sections !== undefined) {
+        await this.syncFacultyAssignments(id, fields.subjects, fields.sections)
+      }
+
       return true
     } catch (err) {
       console.error("Error updating faculty in Supabase:", err)
+      return false
+    }
+  },
+
+  async syncFacultyAssignments(
+    facultyId: string,
+    subjects: string[] | undefined,
+    sections: string[] | undefined
+  ): Promise<boolean> {
+    try {
+      // 1. Get the department ID and the active session ID
+      const deptId = await this.getOrInitializeDepartmentId()
+      const { data: activeSession } = await supabase
+        .from("academic_sessions")
+        .select("id")
+        .eq("status", "ACTIVE")
+        .limit(1)
+        .maybeSingle()
+
+      const sessionId = activeSession?.id
+      if (!sessionId) {
+        console.warn("No active academic session found for faculty assignments sync")
+        return false
+      }
+
+      // 2. Fetch current assignments to know what subjects/sections are already mapped if one of them is undefined
+      const { data: currentAssigns } = await supabase
+        .from("faculty_assignments")
+        .select(`
+          id,
+          subject_id,
+          section_id,
+          subjects (
+            subject_name
+          ),
+          sections (
+            section_name,
+            year
+          )
+        `)
+        .eq("faculty_id", facultyId)
+        .eq("academic_session_id", sessionId)
+        .eq("is_active", true)
+
+      // Extract unique subject names and section names from current assignments
+      const currentSubjects = Array.from(new Set((currentAssigns || []).map(a => (a.subjects as any)?.subject_name).filter(Boolean))) as string[]
+      const currentSections = Array.from(new Set((currentAssigns || []).map(a => `${getRomanYear(yearToLabel((a.sections as any)?.year))} CSE ${(a.sections as any)?.section_name}`).filter(Boolean))) as string[]
+
+      const targetSubjects = subjects !== undefined ? subjects : currentSubjects
+      const targetSections = sections !== undefined ? sections : currentSections
+
+      // 3. Resolve all target subjects to their IDs. If a subject doesn't exist in the subjects table, insert it.
+      const resolvedSubjectIds: string[] = []
+      const { SUBJECTS } = require("@/constants") // Dynamic import to avoid load issues
+      
+      for (const name of targetSubjects) {
+        const trimmedName = name.trim()
+        // Try to find in database first
+        let { data: subData } = await supabase
+          .from("subjects")
+          .select("id")
+          .eq("subject_name", trimmedName)
+          .limit(1)
+          .maybeSingle()
+
+        if (subData) {
+          resolvedSubjectIds.push(subData.id)
+        } else {
+          // Find or generate subject code
+          let code = Object.keys(SUBJECTS).find(k => SUBJECTS[k] === trimmedName) || 
+                     trimmedName.split(" ").map((w: string) => w[0]).join("").toUpperCase().substring(0, 10)
+          if (!code) code = "SUB-" + Date.now().toString().slice(-4)
+          
+          const { data: newSub, error: subErr } = await supabase
+            .from("subjects")
+            .insert({
+              subject_name: trimmedName,
+              subject_code: code,
+              department_id: deptId,
+              semester: 1 // Default
+            })
+            .select("id")
+            .single()
+
+          if (subErr) {
+            console.error("Error creating subject:", subErr.message)
+            continue
+          }
+          resolvedSubjectIds.push(newSub.id)
+        }
+      }
+
+      // 4. Resolve target sections to their database IDs.
+      const resolvedSectionIds: string[] = []
+      // Fetch sections for this department
+      const { data: dbSections } = await supabase
+        .from("sections")
+        .select("id, section_name, year")
+        .eq("department_id", deptId)
+
+      for (const name of targetSections) {
+        const matched = (dbSections || []).find(s => {
+          const sName = `${getRomanYear(yearToLabel(s.year))} CSE ${s.section_name}`
+          return sName.toLowerCase() === name.toLowerCase()
+        })
+        if (matched) {
+          resolvedSectionIds.push(matched.id)
+        } else {
+          console.warn("Could not resolve section name to DB ID:", name)
+        }
+      }
+
+      // 5. Generate target assignments cross product
+      const targetPairs: { subjectId: string; sectionId: string }[] = []
+      for (const subjectId of resolvedSubjectIds) {
+        for (const sectionId of resolvedSectionIds) {
+          targetPairs.push({ subjectId, sectionId })
+        }
+      }
+
+      // 6. Delete assignments that are not in targetPairs
+      const currentPairs = (currentAssigns || []).map(a => ({
+        id: a.id,
+        subjectId: a.subject_id,
+        sectionId: a.section_id
+      }))
+
+      const toDelete = currentPairs.filter(cp => 
+        !targetPairs.some(tp => tp.subjectId === cp.subjectId && tp.sectionId === cp.sectionId)
+      )
+
+      for (const d of toDelete) {
+        await supabase
+          .from("faculty_assignments")
+          .update({ is_active: false })
+          .eq("id", d.id)
+      }
+
+      // 7. Insert assignments that are not in currentPairs
+      const toInsert = targetPairs.filter(tp => 
+        !currentPairs.some(cp => cp.subjectId === tp.subjectId && cp.sectionId === tp.sectionId)
+      )
+
+      if (toInsert.length > 0) {
+        const insertRows = toInsert.map(tp => ({
+          faculty_id: facultyId,
+          subject_id: tp.subjectId,
+          section_id: tp.sectionId,
+          academic_session_id: sessionId,
+          is_active: true
+        }))
+
+        const { error: insErr } = await supabase
+          .from("faculty_assignments")
+          .insert(insertRows)
+
+        if (insErr) {
+          console.error("Error inserting faculty assignments:", insErr.message)
+          return false
+        }
+      }
+
+      return true
+    } catch (err) {
+      console.error("Error syncing faculty assignments:", err)
       return false
     }
   },

@@ -314,7 +314,11 @@ export const useAcademicStore = create<AcademicState>()(
         // Persist to Supabase
         if (!id.startsWith("fac-")) {
           const { SupabaseService } = require("@/services/SupabaseService")
-          SupabaseService.updateFacultyInSupabase(id, fields).catch(console.error)
+          SupabaseService.updateFacultyInSupabase(id, fields)
+            .then(() => {
+              get().syncWithSupabase().catch(console.error)
+            })
+            .catch(console.error)
         }
       },
 

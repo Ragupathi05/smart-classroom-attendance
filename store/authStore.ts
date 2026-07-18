@@ -334,6 +334,41 @@ export const useAuthStore = create<AuthState>()(
           return { success: false, message: "Please enter a valid college email ending with @mits.ac.in." }
         }
 
+        // Sync profile changes to Supabase in the background
+        const state = get()
+        if (state.user) {
+          const userId = state.user.id
+          const userRole = state.user.role
+          const { supabase } = require("@/lib/supabase/client")
+
+          if (userRole === "hod" || userRole === "faculty") {
+            supabase
+              .from("users")
+              .update({
+                full_name: trimmedName,
+                email: trimmedEmail,
+                phone: phone !== undefined ? phone.trim() : state.user.phone
+              })
+              .eq("id", userId)
+              .then(({ error }: any) => {
+                if (error) console.error("Error updating profile in Supabase:", error.message)
+              })
+          } else if (userRole === "cr" || userRole === "lr") {
+            const rollNum = userId.toLowerCase().replace("-cr", "").replace("-lr", "").toUpperCase()
+            supabase
+              .from("students")
+              .update({
+                full_name: trimmedName,
+                email: trimmedEmail,
+                phone: phone !== undefined ? phone.trim() : state.user.phone
+              })
+              .eq("roll_number", rollNum)
+              .then(({ error }: any) => {
+                if (error) console.error("Error updating student profile in Supabase:", error.message)
+              })
+          }
+        }
+
         set((state) => {
           if (!state.user) return {}
           return {
