@@ -866,11 +866,6 @@ export const useAcademicStore = create<AcademicState>()(
              nextState.currentSessionId = ""
            }
  
-           // Automatically set selected section if null
-           if (!get().selectedSectionWorkspace && sections.length > 0) {
-             nextState.selectedSectionWorkspace = sections[0].id
-           }
- 
            set(nextState)
         } catch (err) {
           console.error("Failed to sync with Supabase:", err)

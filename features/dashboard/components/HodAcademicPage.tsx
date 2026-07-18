@@ -62,6 +62,11 @@ export function HodAcademicPage() {
   const confirm = useConfirmStore((state) => state.confirm)
   const timetables = useTimetableStore((state) => state.timetables)
 
+  // Always reset selected section workspace to null on component mount (so we start at the main Academic page)
+  useEffect(() => {
+    setSelectedSectionWorkspace(null)
+  }, [])
+
   // Auto-healing migration for mismatching sections (e.g. from old version bugs)
   useEffect(() => {
     let changed = false
