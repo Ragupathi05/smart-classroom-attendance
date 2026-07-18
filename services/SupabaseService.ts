@@ -514,14 +514,22 @@ export const SupabaseService = {
             ),
             sections (
               section_name,
-              year
+              year,
+              departments (
+                code
+              )
             )
           `)
           .eq("faculty_id", f.id)
           .eq("is_active", true)
 
         const subjects = Array.from(new Set((assignments || []).map(a => (a.subjects as any)?.subject_name).filter(Boolean))) as string[]
-        const sections = Array.from(new Set((assignments || []).map(a => `${yearToLabel((a.sections as any)?.year)} CSE ${(a.sections as any)?.section_name}`).filter(Boolean))) as string[]
+        const sections = Array.from(new Set((assignments || []).map(a => {
+          const s = (a.sections as any)
+          if (!s) return null
+          const deptCode = s.departments?.code ? s.departments.code.split("@")[0] : "CSE"
+          return `${getRomanYear(yearToLabel(s.year))} ${deptCode} ${s.section_name}`
+        }).filter(Boolean))) as string[]
 
         facultyList.push({
           id: f.id,
