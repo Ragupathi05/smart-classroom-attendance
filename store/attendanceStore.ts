@@ -376,12 +376,63 @@ export const useAttendanceStore = create<AttendanceState>()(
         const activeSessionId = cell.academicSessionId || useAcademicStore.getState().currentSessionId
         const activeSectionObj = useAcademicStore.getState().sections.find(s => s.id === activeSectionId)
 
+        const todayDate = new Date().toISOString().split("T")[0]
+        const targetTimeSlot = mergedTimeSlot || cell.timeSlot
+
+        const existingRecordIndex = state.attendanceRecords.findIndex(
+          (r) => r.sectionId === activeSectionId && r.date === todayDate && r.timeSlot === targetTimeSlot
+        )
+
+        if (existingRecordIndex !== -1) {
+          const existingRecord = state.attendanceRecords[existingRecordIndex]
+          const editedAt = new Date().toISOString()
+          const editedBy = `${user?.role.toUpperCase()} - ${user?.name}`
+
+          const updatedRecord: AttendanceRecord = {
+            ...existingRecord,
+            students: state.students.map((student) => ({ ...student })),
+            editedAt,
+            editedBy,
+            isEdited: true,
+          }
+
+          set((prev) => {
+            const nextRecords = prev.attendanceRecords.map((r, idx) =>
+              idx === existingRecordIndex ? updatedRecord : r
+            )
+            AttendanceService.saveRecords(nextRecords)
+            AppSyncService.upsertAttendanceRecord(updatedRecord)
+
+            const drafts = { ...(prev.attendanceDrafts || {}) }
+            delete drafts[cell.id]
+
+            const roster = useAcademicStore.getState().getSectionRoster(activeSectionId)
+            return {
+              attendanceRecords: nextRecords,
+              students: roster.map((student) => ({ ...student, status: "present" })),
+              activeRecordId: null,
+              isViewingSubmittedAttendance: false,
+              isEditMode: false,
+              attendanceDrafts: drafts,
+            }
+          })
+
+          useTimetableStore.getState().setSelectedCell(null)
+          useSharedStore.getState().setCurrentPage("dashboard")
+
+          return {
+            success: true,
+            mode: "updated" as const,
+            message: "Attendance updated (duplicate submission prevented).",
+          }
+        }
+
         const newRecord: AttendanceRecord = {
           id: Date.now().toString(),
           subject: cell.subjectName,
           subjectCode: cell.subjectCode,
-          date: new Date().toISOString().split("T")[0],
-          timeSlot: mergedTimeSlot || cell.timeSlot,
+          date: todayDate,
+          timeSlot: targetTimeSlot,
           className: activeSectionObj?.name || "Class Room",
           sectionId: activeSectionId,
           academicSessionId: activeSessionId,
