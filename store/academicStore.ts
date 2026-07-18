@@ -279,25 +279,60 @@ export const useAcademicStore = create<AcademicState>()(
         selectedSectionWorkspace: state.selectedSectionWorkspace === id ? null : state.selectedSectionWorkspace
       })),
 
-      addFaculty: (faculty) => set((state) => ({
-        facultyList: [...state.facultyList, { ...faculty, id: `fac-${Date.now()}` }],
-        activities: [
-          { id: `act-${Date.now()}`, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), date: "Today", type: "Faculty Registered", detail: `Registered ${faculty.name} (${faculty.code}).` },
-          ...state.activities
-        ]
-      })),
+      addFaculty: (faculty) => {
+        // Optimistically add to local state with temp ID
+        const tempId = `fac-${Date.now()}`
+        set((state) => ({
+          facultyList: [...state.facultyList, { ...faculty, id: tempId }],
+          activities: [
+            { id: `act-${Date.now()}`, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), date: "Today", type: "Faculty Registered", detail: `Registered ${faculty.name} (${faculty.code}).` },
+            ...state.activities
+          ]
+        }))
 
-      updateFaculty: (id, fields) => set((state) => ({
-        facultyList: state.facultyList.map((f) => f.id === id ? { ...f, ...fields } : f)
-      })),
+        // Persist to Supabase in the background
+        SupabaseService.getOrInitializeDepartmentId().then(async (deptId: string) => {
+          const created = await SupabaseService.createFaculty(faculty, deptId)
+          if (created) {
+            // Replace the temp ID with the real database ID
+            set((state) => ({
+              facultyList: state.facultyList.map((f) =>
+                f.id === tempId ? { ...f, id: created.id } : f
+              )
+            }))
+          } else {
+            console.error("Failed to persist faculty to database — faculty will be lost on refresh")
+          }
+        }).catch(console.error)
+      },
 
-      deactivateFaculty: (id) => set((state) => ({
-        facultyList: state.facultyList.map((f) => f.id === id ? { ...f, status: "Inactive" as const } : f)
-      })),
+      updateFaculty: (id, fields) => {
+        set((state) => ({
+          facultyList: state.facultyList.map((f) => f.id === id ? { ...f, ...fields } : f)
+        }))
+        // Persist to Supabase
+        if (!id.startsWith("fac-")) {
+          SupabaseService.updateFacultyInSupabase(id, fields).catch(console.error)
+        }
+      },
 
-      deleteFaculty: (id) => set((state) => ({
-        facultyList: state.facultyList.filter((f) => f.id !== id)
-      })),
+      deactivateFaculty: (id) => {
+        set((state) => ({
+          facultyList: state.facultyList.map((f) => f.id === id ? { ...f, status: "Inactive" as const } : f)
+        }))
+        if (!id.startsWith("fac-")) {
+          SupabaseService.deactivateFacultyInSupabase(id).catch(console.error)
+        }
+      },
+
+      deleteFaculty: (id) => {
+        set((state) => ({
+          facultyList: state.facultyList.filter((f) => f.id !== id)
+        }))
+        if (!id.startsWith("fac-")) {
+          SupabaseService.deleteFacultyInSupabase(id).catch(console.error)
+        }
+      },
 
       assignCRLR: async (sectionId, crName, lrName) => {
         const section = get().sections.find((s) => s.id === sectionId)

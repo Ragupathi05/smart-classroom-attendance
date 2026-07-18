@@ -528,17 +528,43 @@ export const SupabaseService = {
 
   async createFaculty(fac: Omit<FacultyMember, "id">, deptId: string): Promise<FacultyMember | null> {
     try {
-      // Create user record in Supabase users table (Note: auth is done through separate flow or mock keys)
-      // Since users table references auth.users(id), we generate a valid UUID for mock/sync logins,
-      // or map it directly. If we are running in HOD setup mode, HOD registers the faculty.
-      const newId = crypto.randomUUID()
+      // Use a separate Supabase client for signup so we don't affect the HOD's session
+      const { createClient } = await import("@supabase/supabase-js")
+      const signupClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { auth: { persistSession: false, autoRefreshToken: false } }
+      )
+
+      // 1. Create auth user via signUp (generates a valid auth.users entry)
+      const tempPassword = `Faculty@${fac.code}123`
+      const { data: authData, error: authError } = await signupClient.auth.signUp({
+        email: fac.email,
+        password: tempPassword,
+        options: {
+          data: { full_name: fac.name, role: "Faculty" }
+        }
+      })
+
+      if (authError) {
+        console.error("Auth signUp error:", authError.message)
+        throw authError
+      }
+
+      if (!authData.user) {
+        throw new Error("No user returned from signUp")
+      }
+
+      const authUserId = authData.user.id
+
+      // 2. Insert into users table using the auth user ID (satisfies FK to auth.users)
       const { data, error } = await supabase
         .from("users")
         .insert({
-          id: newId,
+          id: authUserId,
           full_name: fac.name,
           email: fac.email,
-          phone: fac.phone,
+          phone: fac.phone || null,
           faculty_code: fac.code,
           role: "Faculty",
           department_id: deptId,
@@ -547,7 +573,11 @@ export const SupabaseService = {
         .select("*")
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error("Users table insert error:", error.message)
+        throw error
+      }
+
       return {
         id: data.id,
         code: data.faculty_code,
@@ -567,7 +597,69 @@ export const SupabaseService = {
     }
   },
 
-  // 6. Students & Assignments
+  async updateFacultyInSupabase(id: string, fields: Partial<FacultyMember>): Promise<boolean> {
+    try {
+      const updateData: Record<string, unknown> = {}
+      if (fields.name !== undefined) updateData.full_name = fields.name
+      if (fields.email !== undefined) updateData.email = fields.email
+      if (fields.phone !== undefined) updateData.phone = fields.phone
+      if (fields.code !== undefined) updateData.faculty_code = fields.code
+      if (fields.status !== undefined) updateData.is_active = fields.status === "Active"
+
+      if (Object.keys(updateData).length === 0) return true
+
+      const { error } = await supabase
+        .from("users")
+        .update(updateData)
+        .eq("id", id)
+
+      if (error) {
+        console.error("Error updating faculty:", error.message)
+        return false
+      }
+      return true
+    } catch (err) {
+      console.error("Error updating faculty in Supabase:", err)
+      return false
+    }
+  },
+
+  async deactivateFacultyInSupabase(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ is_active: false })
+        .eq("id", id)
+
+      if (error) {
+        console.error("Error deactivating faculty:", error.message)
+        return false
+      }
+      return true
+    } catch (err) {
+      console.error("Error deactivating faculty in Supabase:", err)
+      return false
+    }
+  },
+
+  async deleteFacultyInSupabase(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from("users")
+        .delete()
+        .eq("id", id)
+
+      if (error) {
+        console.error("Error deleting faculty:", error.message)
+        return false
+      }
+      return true
+    } catch (err) {
+      console.error("Error deleting faculty in Supabase:", err)
+      return false
+    }
+  },
+
   async fetchStudentsRoster(sectionId: string): Promise<Student[]> {
     try {
       const { data, error } = await supabase
