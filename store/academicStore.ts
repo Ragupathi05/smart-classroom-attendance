@@ -291,6 +291,7 @@ export const useAcademicStore = create<AcademicState>()(
         }))
 
         // Persist to Supabase in the background
+        const { SupabaseService } = require("@/services/SupabaseService")
         SupabaseService.getOrInitializeDepartmentId().then(async (deptId: string) => {
           const created = await SupabaseService.createFaculty(faculty, deptId)
           if (created) {
@@ -312,6 +313,7 @@ export const useAcademicStore = create<AcademicState>()(
         }))
         // Persist to Supabase
         if (!id.startsWith("fac-")) {
+          const { SupabaseService } = require("@/services/SupabaseService")
           SupabaseService.updateFacultyInSupabase(id, fields).catch(console.error)
         }
       },
@@ -321,6 +323,7 @@ export const useAcademicStore = create<AcademicState>()(
           facultyList: state.facultyList.map((f) => f.id === id ? { ...f, status: "Inactive" as const } : f)
         }))
         if (!id.startsWith("fac-")) {
+          const { SupabaseService } = require("@/services/SupabaseService")
           SupabaseService.deactivateFacultyInSupabase(id).catch(console.error)
         }
       },
@@ -330,6 +333,7 @@ export const useAcademicStore = create<AcademicState>()(
           facultyList: state.facultyList.filter((f) => f.id !== id)
         }))
         if (!id.startsWith("fac-")) {
+          const { SupabaseService } = require("@/services/SupabaseService")
           SupabaseService.deleteFacultyInSupabase(id).catch(console.error)
         }
       },
