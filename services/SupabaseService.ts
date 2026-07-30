@@ -952,6 +952,12 @@ export const SupabaseService = {
 
   async deleteSectionInSupabase(id: string): Promise<boolean> {
     try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+      if (!isUuid) {
+        console.warn("deleteSectionInSupabase: Bypassed database deletion as ID is not a valid UUID:", id)
+        return true
+      }
+
       // 1. Delete timetable cells for this section
       await supabase
         .from("app_timetable_cells")
@@ -1101,9 +1107,10 @@ export const SupabaseService = {
     nextYearLevel: string, 
     targetSemester: "Odd" | "Even",
     config: { retainFaculty: boolean; retainTimetable: boolean }
-  ): Promise<{ success: boolean; nextSessionId?: string }> {
+  ): Promise<{ success: boolean; nextSessionId?: string; sectionIdMap?: Record<string, string> }> {
     try {
       const deptId = await this.getOrInitializeDepartmentId()
+      const sectionIdMap: Record<string, string> = {}
 
       // 1. Check or create next academic session
       const nextSessionId = `session-${nextSessionName}`
@@ -1180,6 +1187,7 @@ export const SupabaseService = {
           .single()
 
         if (newSecError) continue
+        sectionIdMap[oldSec.id] = newSec.id
 
         // Migrate student assignments
         const { data: oldAssignments } = await supabase
@@ -1227,7 +1235,7 @@ export const SupabaseService = {
         }
       }
 
-      return { success: true, nextSessionId: finalSessionId }
+      return { success: true, nextSessionId: finalSessionId, sectionIdMap }
     } catch (err) {
       console.error("Supabase promotion error:", err)
       return { success: false }

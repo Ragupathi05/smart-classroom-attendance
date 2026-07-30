@@ -505,6 +505,8 @@ export const useAcademicStore = create<AcademicState>()(
         const newSectionsList = [...get().sections]
         const newAssignments = [...get().enrollments]
 
+        const sectionIdMap = (dbResult.success && dbResult.sectionIdMap) ? dbResult.sectionIdMap : {}
+
         batchSections.forEach((oldSec) => {
           let nextName = oldSec.name
           if (isOddTransition) {
@@ -514,7 +516,7 @@ export const useAcademicStore = create<AcademicState>()(
             else if (oldSec.year === "4th Year") nextName = `${oldSec.name} (Graduated)`
           }
 
-          const newSectionId = `sec-promoted-${oldSec.id}-${Date.now()}`
+          const newSectionId = sectionIdMap[oldSec.id] || `sec-promoted-${oldSec.id}-${Date.now()}`
           const newSectionObj: Section = {
             ...oldSec,
             id: newSectionId,
